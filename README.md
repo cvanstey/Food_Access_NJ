@@ -10,24 +10,43 @@ This project analyzes food landscapes across New Jersey ZIP codes by comparing U
 
 ## Methodology Reference
 
-Comparison of food access measurement approaches used or referenced in this analysis:
+It was important to compare methods of food access measurement implemented by federal and state levels. 
 
 | Method / Tool | Focus Area | Core Approach / Metric | Formula | Primary Source |
 |---|---|---|---|---|
 | USDA Research Atlas | Food Deserts | Poverty and distance thresholds | Distance ≥ 1 mi (urban) or ≥ 10 mi (rural) + Poverty Rate ≥ 20% | USDA ERS Food Access Research Atlas |
-| GIS Network Analysis | Both | Street routes and travel times | Network distance (actual routing) vs. Euclidean distance (straight line) | Urban Planning GIS Frameworks |
+usda_desert_flag/is_desert_usda recreates the poverty≥20% + distance threshold rule directly. is_desert_fara instead pulls the official FARA LILA tract flag (usda_lila_1_10) from upstream data — this means there is a self-computed and an authoritative version, compared against each other in the print block.
+
 | RFEI | Food Swamps | Ratio of unhealthy to healthy retailers | (Fast Food + Convenience Stores) / (Supermarkets + Produce Markets) | Public Health Research Standard |
+Section 1 — rfei = (fast_food + convenience) / (supermarket + grocery + produce_market), exactly your table's formula. rfei_full extends it with dollar stores.
+
 | mRFEI | Food Swamps | % of healthy retailers in tract | (Healthy Food Retailers / Total Food Retailers) × 100 | CDC |
-| Market-Basket Survey | Food Deserts | Manual in-store tracking of produce | Comparative cost/variety indexing of standardized staple items | Field Research Methodologies |
+Section 2 — mrfei = (healthy / total) × 100, the CDC formula as written.
+
+| NJ Food Swamp Score | Food Swamps | Distance to swamp vs. supermarket | (Shortest dist. to swamp outlet / Shortest dist. to supermarket), scaled 0–100 | NJ DCA / NJEDA Approved Food Deserts Map |
+Section 4 — nj_swamp_score = nearest fast food / nearest supermarket distance, scaled 0–100. Matches the table's distance-ratio formula.
+
+| GIS Network Analysis | Both | Street routes and travel times | Network distance (actual routing) vs. Euclidean distance (straight line) | Urban Planning GIS Frameworks |
+nearest_supermarket_miles / nearest_fastfood_miles are used as inputs, however, supermarkets_within_5mi is explicitly commented # placeholder using ZIP count until spatial buffer computed — the point-in-polygon buffer described in the table isn't implemented yet.
+
+
+mrfei_wic (WIC-specific mRFEI variant), dollar store ratio/dominance/desert flags
+the rule-based access_typology classifier (True Desert / Food Swamp / Food Mirage / Dollar Store Desert)
+the 4-method swamp consensus vote (is_swamp_consensus, swamp_method_count)
+
+Food Environment Index composite_vuln_index, novehicle_vuln_score, elderly_vuln_score blend proximity + poverty/access into a weighted score — but use percentile-rank weighting, not the CHR&R 0–10 ranked-average method used in table cites.
+
 | Machine Learning | Food Deserts | Predicts access using census variables | Predictive modeling (Hot-Spot Analysis, regression) | Advanced Spatial Data Science |
 | Food Environment Index | Combined | Merges proximity with food insecurity | Weighted average rank (0–10) of limited access + food insecurity | County Health Rankings & Roadmaps |
 | Spatial Buffering | Food Swamps | Counts fast food within walking zones | Point-in-polygon aggregation within 0.25/0.5 mi buffers | GIS Spatial Analysis |
-| NJ Food Swamp Score | Food Swamps | Distance to swamp vs. supermarket | (Shortest dist. to swamp outlet / Shortest dist. to supermarket), scaled 0–100 | NJ DCA / NJEDA Approved Food Deserts Map |
+
 | Composite Factor Score | Combined | Weights 24 neighborhood indicators | Iterated principal factor analysis, orthogonal varimax rotation | NJ Food Desert Designation Methodology |
+I used a different method here - Same composite_vuln_index is the closest analog, but it's a hand-weighted percentile composite — not the iterated principal factor analysis with varimax rotation specified by the NJEDA. I would need actual factor analysis, not weighted ranks to achieve this.
+
 | Structural Determinants Model | Food Swamps & Transit | Intersects transport barriers with retail environments | Multi-variable intersectional analysis of retail density vs. transit equity | IJERPH / MDPI Study (v22y2025i10p1481) |
 | FDC Programmatic Allocation Framework | Program Deployment | Maps statistical scores to capital investments, tax credits, grants | Rank-ordered classification (1–50) across 1,015 block groups | NJEDA Food Security Products Deck (March 2024) |
 
-**Related references:**
+**Related references:** - I was thinking about highlighting where the state is encouraging disepensaries in economically disadvantaged areas because I believe there is a correlation between food quality and vice retail. This is not currently part of the analysis. 
 - NJ Economically Disadvantaged Areas: https://www.nj.gov/cannabis/businesses/priority-applications/
 - NJEDA Priority Applications: https://www.nj.gov/cannabis/businesses/priority-applications/eda/
 
@@ -60,8 +79,6 @@ A free Census API key removes rate limits on ACS data requests.
 ```bash
 export CENSUS_API_KEY="your-key-here"
 ```
-
-> 🔐 **Security note:** `01_load_data.py` currently has a Census API key hardcoded directly in the source (`CENSUS_API_KEY = "..."`). If this file is or will be committed to version control, that key should be treated as compromised — regenerate it at the link above, then update the script to read it via `os.environ.get("CENSUS_API_KEY", "")` and add a `.env` (excluded via `.gitignore`) for local development instead.
 
 ### 4. Download the local data files
 
