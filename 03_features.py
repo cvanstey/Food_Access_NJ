@@ -131,6 +131,7 @@ df["dollar_store_desert"]    = ((df["dollar_store"] > 0) & (df["supermarket"] ==
 # ═════════════════════════════════════════════════════════════════════════════
 def classify(row):
     has_super  = row["supermarket"] > 0
+
     swamp      = row["is_swamp_rfei"] == 1
     far        = row["nearest_supermarket_miles"] >= 1
     poverty    = row["pct_poverty"] > 20
@@ -315,7 +316,6 @@ def compare_zips(zip_codes: list, df: pd.DataFrame):
     print(out.to_string())
 
 
-
 # ── Desert target labels ──────────────────────────────────────────────────
 df["is_food_desert"] = df["usda_desert_flag"]  # USDA definition
 
@@ -339,7 +339,8 @@ df["is_desert_consensus"] = (
 ).astype(int)
 
 # Model target — be explicit about which definition drives the classifier
-df["is_food_desert"] = df["is_desert_fara"]   # ← change this one line to swap definitions
+#df["is_food_desert"] = df["is_desert_fara"]
+df["is_food_desert"] = df["is_desert_consensus"]
 
 print("\n── Desert definition comparison")
 print(f"  USDA strict (14 expected)      : {df['is_desert_usda'].sum()}")
