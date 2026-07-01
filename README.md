@@ -70,7 +70,7 @@ Place these inside `data/`:
 ├── 03_features.py
 ├── 04_model.py
 ├── 05_reports.py
-├── 06_analysis.py
+├── 06_analytics.py
 ├── 07_targeted_analysis.py
 ├── 08_zip_lookup.py
 ├── data/
