@@ -88,18 +88,34 @@ Place these inside `data/`:
 
 ## Running the Pipeline
 
-> **Note:** A `run_pipeline.py` orchestrator is planned but not yet implemented. Run scripts manually in order for now.
+## Running the Pipeline
+
+Run the full pipeline with the orchestrator:
 
 ```bash
-python 01_load_data.py          # Data acquisition — downloads/reads all source datasets
-python 02a_nearest.py           # Distance calculations (supermarkets, convenience stores, etc.)
-python 02b_merge_sources.py     # Merges all cleaned sources into a single ZIP-level feature table
-python 03_features.py           # Builds derived features and metrics
-python 04_model.py              # Statistical / ML modeling
-python 05_reports.py            # Generates report outputs
-python 06_analysis.py           # Core analysis
-python 07_targeted_analysis.py  # Sub-population analysis (elderly ZIPs, per hypothesis)
-python 08_zip_lookup.py         # Interactive ZIP-level lookup tool
+python run_pipeline.py
+```
+
+This runs every stage below in order and stops immediately if one fails, logging full output to `pipeline_logs/`. Resume from a failed stage with `python run_pipeline.py --from <stage_id>`, or run a single stage with `python run_pipeline.py --only <stage_id>`.
+
+**Manual / individual stages**, if you need to run one by hand:
+
+```bash
+python 01_load_data.py              # Data acquisition — downloads/reads all source datasets
+python 02a_nearest.py               # Distance calculations (supermarkets, convenience stores, etc.)
+python 02b_merge_sources.py         # Merges all cleaned sources into a single ZIP-level feature table
+python clean_NJ_features_zip2.py    # Cleans nj_zip_features_v2.csv (dedup, sentinel values, type fixes) → nj_zip_features_v2_clean.csv
+python 03_features.py               # Builds derived features and metrics
+python 04_model.py                  # Statistical / ML modeling
+python 05_reports.py                # Generates report outputs
+python 06_analytics.py               # Core analysis
+python 07_targeted_analysis.py      # Sub-population analysis (elderly ZIPs, per hypothesis)
+python 08_zip_lookup.py             # Interactive ZIP-level lookup tool
+```
+
+`rename_columns.py` is not a standalone stage — it's imported directly by `02b_merge_sources.py` to rename ACS/PLACES columns before saving. `pipeline_utils.py` is likewise a shared module, not a stage.
+
+*Note: `clean_NJ_features_zip2.py` isn't yet renamed to match the pipeline's numbered convention (e.g. `02c_clean_features.py`) — rename it and update `run_pipeline.py`'s `STAGES` list once you do.*
 ```
 
 `01_load_data.py` performs data acquisition only — it downloads/reads all source datasets, prints a confirmation summary for each of its 10 sections, and writes cleaned intermediate files into `data/` for use by later steps: `acs_df.csv`, `places_df.csv`, `crosswalk_df.csv`, `wic_df.csv`, `snap_df.csv`, `fara_agg.csv`, `osm_counts.csv`, `njeda_communities.csv`.
