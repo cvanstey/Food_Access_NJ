@@ -4,6 +4,16 @@ Analyzes food landscapes across New Jersey ZIP codes by comparing USDA Food Acce
 
 ---
 
+## Features
+
+- Integrates USDA, Census, CDC PLACES, NJEDA, SNAP, WIC, and OpenStreetMap datasets
+- Calculates nearest supermarket and food retailer distances
+- Implements USDA Food Access Research Atlas methodology
+- Computes multiple Food Swamp metrics (RFEI, mRFEI, NJEDA)
+- Generates ZIP-level vulnerability indices
+- Produces reports and statistical analyses
+- Interactive ZIP code lookup utility
+
 ## Hypothesis
 
 **Working hypothesis:** New Jersey ZIP codes with higher concentrations of older adults experience significantly poorer food access, characterized by greater supermarket distance and lower availability of SNAP and WIC food retailers.
@@ -63,37 +73,43 @@ Place these inside `data/`:
 ### Expected project structure
 
 ```
-[project-root]/
-├── 01_load_data.py
-├── 02a_nearest.py
-├── 02b_merge_sources.py
-├── 03_features.py
-├── 04_model.py
-├── 05_reports.py
-├── 06_analytics.py
-├── 07_targeted_analysis.py
-├── 08_zip_lookup.py
+NJ_Food_Access/
+│
 ├── data/
-│   ├── nj_zip_complete.csv
-│   ├── nj_zip_crosswalk.csv
-│   ├── zcta_nj.gpkg
-│   ├── FoodAccessResearchAtlasData2019.xlsx
-│   ├── ZIP_TRACT_122025.xlsx
-│   ├── snap_retailer_location_data.csv
-│   └── food-security-product-deck.-march-2024.pdf
-└── README.md
+├── pipeline_logs/
+├── plots/
+├── reports/
+├── src/
+│   ├── run_pipeline.py
+│   ├── pipeline_utils.py
+│   ├── 00a_build_crosswalk.py
+│   ├── 00b_enrich_crosswalk.py
+│   ├── 01_load_data.py
+│   ├── 02a_nearest.py
+│   ├── 02b_merge_sources.py
+│   ├── 02c_clean_NJ_features_zip2.py
+│   ├── 03_features.py
+│   ├── 04_model.py
+│   ├── 05_reports.py
+│   ├── 06_analytics.py
+│   ├── 07_targeted_analysis.py
+│   ├── 08_zip_lookup.py
+│   ├── rename_columns.py
+│   └── njzipfilter.py
+│
+├── testing/
+├── requirements.txt
+├── README.md
+└── .gitignore
 ```
 
 ---
-
-## Running the Pipeline
-
 ## Running the Pipeline
 
 Run the full pipeline with the orchestrator:
 
 ```bash
-python run_pipeline.py
+python src/run_pipeline.py
 ```
 
 This runs every stage below in order and stops immediately if one fails, logging full output to `pipeline_logs/`. Resume from a failed stage with `python run_pipeline.py --from <stage_id>`, or run a single stage with `python run_pipeline.py --only <stage_id>`.
@@ -101,6 +117,8 @@ This runs every stage below in order and stops immediately if one fails, logging
 **Manual / individual stages**, if you need to run one by hand:
 
 ```bash
+00a_build_crosswalk.py
+00b_enrich_crosswalk.py
 python 01_load_data.py              # Data acquisition — downloads/reads all source datasets
 python 02a_nearest.py               # Distance calculations (supermarkets, convenience stores, etc.)
 python 02b_merge_sources.py         # Merges all cleaned sources into a single ZIP-level feature table
@@ -184,13 +202,6 @@ All four swamp methods are combined into a consensus flag (`is_swamp_consensus`)
 ### On OSM Classifications
 
 OSM uses its own tagging taxonomy that does not map cleanly onto food access research definitions. Wawa is tagged `shop=convenience` in OSM (inflating the RFEI numerator), and small grocers are often tagged the same way (deflating the denominator). RFEI and mRFEI store counts therefore use SNAP/WIC data where available; OSM data is used primarily for spatial features (nearest-distance calculations) where it is more reliable.
-
-### Related References
-
-Cannabis dispensary placement in economically disadvantaged areas is not currently part of this analysis but is flagged as a potential extension — there may be a meaningful correlation between food quality and vice retail proximity.
-
-- [NJ Economically Disadvantaged Areas](https://www.nj.gov/cannabis/businesses/priority-applications/)
-- [NJEDA Priority Applications](https://www.nj.gov/cannabis/businesses/priority-applications/eda/)
 
 ---
 
