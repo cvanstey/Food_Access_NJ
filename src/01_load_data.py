@@ -40,7 +40,7 @@ import re
 import time
 import warnings
 from pathlib import Path
-
+import gdown
 import geopandas as gpd
 import numpy as np
 import pandas as pd
@@ -186,6 +186,18 @@ OSM_COL_MAP = {
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 # section() and normalize_zip() now live in pipeline_utils.py (imported above)
+
+FOLDER_URL = "https://drive.google.com/drive/folders/1RMIZwLmmeUC1CMEF0X8oBuy4m7azTiOo"
+
+# Download only if the files aren't already present
+if not (DATA_DIR / "nj_zip_features_v5.csv").exists():
+    print("Downloading shared project data from Google Drive...")
+    gdown.download_folder(
+        url=FOLDER_URL,
+        output=str(DATA_DIR),
+        quiet=False,
+    )
+    print("Download complete.")
 
 
 def http_get(url: str, *, timeout: int = 300, post_data: dict = None,
