@@ -35,6 +35,7 @@ cd [repo-name]
 
 ```bash
 pip install -r requirements.txt
+```
 
 ### 3. Set up a Census API key (optional, recommended)
 
@@ -78,7 +79,7 @@ NJ_Food_Access/
 ├── plots/
 ├── reports/
 └── README.md
-
+```
 
 > If `nj_zip_complete.csv` is missing, `01_load_data.py` will raise a `FileNotFoundError` and prompt you to run `nj_zip_crosswalk.py` to regenerate it. That script isn't part of this checklist since the generated file is included in the Drive download — but keep it in mind if you need to rebuild the crosswalk from scratch.
 
@@ -114,6 +115,7 @@ NJ_Food_Access/
 ├── README.md
 └── .gitignore
 ```
+
 ## Google Colab
 
 A Google Colab notebook is provided for reproducible execution:
@@ -168,7 +170,6 @@ python 08_zip_lookup.py             # Interactive ZIP-level lookup tool
 `rename_columns.py` is not a standalone stage — it's imported directly by `02b_merge_sources.py` to rename ACS/PLACES columns before saving. `pipeline_utils.py` is likewise a shared module, not a stage.
 
 *Note: `clean_NJ_features_zip2.py` isn't yet renamed to match the pipeline's numbered convention (e.g. `02c_clean_features.py`) — rename it and update `run_pipeline.py`'s `STAGES` list once you do.*
-```
 
 `01_load_data.py` performs data acquisition only — it downloads/reads all source datasets, prints a confirmation summary for each of its 10 sections, and writes cleaned intermediate files into `data/` for use by later steps: `acs_df.csv`, `places_df.csv`, `crosswalk_df.csv`, `wic_df.csv`, `snap_df.csv`, `fara_agg.csv`, `osm_counts.csv`, `njeda_communities.csv`.
 
