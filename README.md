@@ -8,7 +8,7 @@ Analyzes food landscapes across New Jersey ZIP codes by comparing USDA Food Acce
 
 - Integrates USDA, Census, CDC PLACES, NJEDA, SNAP, WIC, and OpenStreetMap datasets
 - Calculates nearest supermarket and food retailer distances
-- Implements USDA Food Access Research Atlas methodology
+- Evaluates food access patterns aggregated to ZIP/ZCTA reporting units while preserving tract-level USDA comparisons where available
 - Computes multiple Food Swamp metrics (RFEI, mRFEI, NJEDA)
 - Generates ZIP-level vulnerability indices
 - Produces reports and statistical analyses
@@ -34,8 +34,7 @@ cd [repo-name]
 ### 2. Install dependencies
 
 ```bash
-pip install requests geopandas pandas pdfplumber numpy openpyxl
-```
+pip install -r requirements.txt```
 
 ### 3. Set up a Census API key (optional, recommended)
 
@@ -117,12 +116,14 @@ This runs every stage below in order and stops immediately if one fails, logging
 **Manual / individual stages**, if you need to run one by hand:
 
 ```bash
-00a_build_crosswalk.py
-00b_enrich_crosswalk.py
+If nj_zip_complete.csv is missing, regenerate it by running:
+
+python 00a_build_crosswalk.py
+python 00b_enrich_crosswalk.py
 python 01_load_data.py              # Data acquisition — downloads/reads all source datasets
 python 02a_nearest.py               # Distance calculations (supermarkets, convenience stores, etc.)
 python 02b_merge_sources.py         # Merges all cleaned sources into a single ZIP-level feature table
-python clean_NJ_features_zip2.py    # Cleans nj_zip_features_v2.csv (dedup, sentinel values, type fixes) → nj_zip_features_v2_clean.csv
+python 02c_clean_NJ_features_zip2.py    # Cleans nj_zip_features_v2.csv (dedup, sentinel values, type fixes) → nj_zip_features_v2_clean.csv
 python 03_features.py               # Builds derived features and metrics
 python 04_model.py                  # Statistical / ML modeling
 python 05_reports.py                # Generates report outputs
@@ -155,9 +156,8 @@ python 08_zip_lookup.py             # Interactive ZIP-level lookup tool
 | USDA FARA (tract-level) | 2,002 rows × 12 cols |
 | USDA FARA (ZIP-aggregated) | 691 rows × 12 cols |
 
-Exit code `0` indicates a clean run with no validation errors.
-
 The script ends with an **out-of-state ZIP trace** — a diagnostic check confirming that border ZCTAs which geometrically touch NJ counties (e.g. `19153` in Philadelphia, `10977` in Spring Valley, NY) are correctly filtered out before reaching the final ZIP-level datasets. Seeing these ZIPs in early-stage debug output is expected; seeing them in final aggregated files would indicate a bug.
+
 
 ---
 
@@ -168,7 +168,7 @@ This project implements and compares several established food access measurement
 ### Food Desert Methods
 
 **USDA Food Access Research Atlas (FARA)**
-Flags tracts meeting a poverty ≥ 20% threshold combined with distance to nearest supermarket ≥ 1 mile (urban) or ≥ 10 miles (rural). Two versions are maintained: `usda_desert_flag` / `is_desert_usda` self-computes the rule directly from local data; `is_desert_fara` pulls the official FARA LILA tract flag (`usda_lila_1_10`) from upstream data. Both are compared in the analysis output.
+This project implements the primary USDA ERS Low Income Low Access (LILA) measure using poverty and supermarket-distance thresholds. Official USDA FARA flags are also imported for comparison.
 
 ### Food Swamp Methods
 
@@ -234,8 +234,18 @@ OSM results are cached locally to `data/osm_data.json` after the first run to av
 | `food-security-product-deck.-march-2024.pdf` | NJEDA Food Security reference deck, March 2024 | NJEDA |
 
 ---
+## Outputs
 
-## Notes
+The pipeline generates:
 
-- The `data/` folder is excluded from version control via `.gitignore` — both downloaded source files and pipeline-generated intermediates (`*.csv`, `osm_data.json`) should not be committed to GitHub.
-- Never commit API keys. Use environment variables and a `.env` file excluded via `.gitignore`.
+| Output | Description |
+|---|---|
+| nj_zip_features_v5.csv | Final ZIP-level feature matrix |
+| nj_zip_scores.csv | Model predictions and vulnerability scores |
+| county_summary.csv | County-level food access summaries |
+| municipality_summary.csv | Municipality-level summaries |
+| access_typology_profiles.csv | Food access classification profiles |
+| plots/ | EDA and model visualizations |
+| reports/ | Analytical summaries |
+
+---
