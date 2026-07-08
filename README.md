@@ -136,6 +136,16 @@ python src/run_pipeline.py
 
 This runs every stage below in order and stops immediately if one fails, logging full output to `pipeline_logs/`. Resume from a failed stage with `python run_pipeline.py --from <stage_id>`, or run a single stage with `python run_pipeline.py --only <stage_id>`.
 
+### The Pipeline
+
+The pipeline runs in ten stages. Stage 4 (modeling) is by far the longest, typically taking up to 6 minutes. It fits three separate models — including 20 individual health-outcome regressors — and validates them thoroughly: a leave-one-county-out cross-validation that trains a fresh Random Forest once per NJ county (21 fits total), a 2,000-resample bootstrap for confidence intervals, and permutation importance with 20 repeats per feature. If a run appears to hang here, it's very likely still working — this stage does more computation than the rest of the pipeline combined.
+
+Note that stage output does not stream live when run through the orchestrator — each stage runs as a subprocess with `stdout` redirected straight to its log file in `pipeline_logs/`, so the notebook/terminal will show nothing between stage headers no matter how long a stage takes. To check that a long-running stage (especially stage 4) is still progressing, tail the current log file in a separate cell/terminal:
+
+```bash
+tail -f pipeline_logs/run_<timestamp>.log
+```
+
 **Manual / individual stages**, if you need to run one by hand:
 
 ```bash
