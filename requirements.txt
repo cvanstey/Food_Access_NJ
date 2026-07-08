@@ -1,4 +1,5 @@
 numpy
+python-docx
 pandas
 scipy
 scikit-learn
