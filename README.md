@@ -114,7 +114,17 @@ NJ_Food_Access/
 ├── README.md
 └── .gitignore
 ```
+## Google Colab
 
+A Google Colab notebook is provided for reproducible execution:
+
+[Open in Google Colab]([COLAB_LINK](https://colab.research.google.com/drive/1MB6RLrqhqrNn8QonWsdPujrutfzU-swH?usp=sharing))
+
+The notebook:
+1. Clones this repository
+2. Installs dependencies
+3. Mounts the Google Drive data package
+4. Runs the complete pipeline
 ---
 ## Running the Pipeline
 
