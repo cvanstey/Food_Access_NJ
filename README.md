@@ -34,7 +34,7 @@ cd [repo-name]
 ### 2. Install dependencies
 
 ```bash
-pip install -r requirements.txt```
+pip install -r requirements.txt
 
 ### 3. Set up a Census API key (optional, recommended)
 
@@ -47,25 +47,38 @@ A free Census API key removes rate limits on ACS data requests.
 export CENSUS_API_KEY="your-key-here"
 ```
 
-### 4. Download the local data files
+### 4. Download project data
 
-The data files required to run this project are too large to host on GitHub. Download them from Google Drive:
+The datasets required to reproduce this analysis are too large to store in GitHub. Download the data package from Google Drive:
 
-**[Download data files →](https://drive.google.com/drive/folders/14_zmFgw-F0yEetg64rVz1eCSIC9dVMWp?usp=drive_link)**
+**Download data package:**  
+[Google Drive Data Folder](https://drive.google.com/drive/folders/14_zmFgw-F0yEetg64rVz1eCSIC9dVMWp?usp=drive_link)
 
-Unzip the contents into a `data/` folder at the project root.
+After downloading:
 
-#### Required files
+1. Extract the files.
+2. Create a `data/` directory in the project root if it does not already exist.
+3. Place all downloaded files directly inside the `data/` folder.
 
-Place these inside `data/`:
+The expected project structure is:
 
-- [ ] `nj_zip_complete.csv` — full ZIP → municipality/census tract crosswalk
-- [ ] `nj_zip_crosswalk.csv` — valid NJ ZIP list, used to filter out-of-state border ZCTAs
-- [ ] `zcta_nj.gpkg` — NJ ZCTA boundary geometries
-- [ ] `FoodAccessResearchAtlasData2019.xlsx` — USDA FARA, tract-level
-- [ ] `ZIP_TRACT_122025.xlsx` — HUD ZIP-to-tract crosswalk
-- [ ] `snap_retailer_location_data.csv` — USDA SNAP-authorized retailers
-- [ ] `food-security-product-deck.-march-2024.pdf` — NJEDA deck (source for food desert community rankings)
+```text
+NJ_Food_Access/
+│
+├── data/
+│   ├── nj_zip_complete.csv
+│   ├── nj_zip_crosswalk.csv
+│   ├── zcta_nj.gpkg
+│   ├── FoodAccessResearchAtlasData2019.xlsx
+│   ├── ZIP_TRACT_122025.xlsx
+│   ├── snap_retailer_location_data.csv
+│   └── food-security-product-deck.-march-2024.pdf
+│
+├── src/
+├── plots/
+├── reports/
+└── README.md
+
 
 > If `nj_zip_complete.csv` is missing, `01_load_data.py` will raise a `FileNotFoundError` and prompt you to run `nj_zip_crosswalk.py` to regenerate it. That script isn't part of this checklist since the generated file is included in the Drive download — but keep it in mind if you need to rebuild the crosswalk from scratch.
 
@@ -160,11 +173,18 @@ The script ends with an **out-of-state ZIP trace** — a diagnostic check confir
 
 
 ---
+## Statistical Modeling
 
-## Methodology
+The project evaluates food access vulnerability using:
 
-This project implements and compares several established food access measurement frameworks at the ZIP level.
+- Exploratory data analysis and correlation analysis
+- Logistic regression classification
+- Random Forest classification
+- Gradient Boosting classification
+- Leave-one-county-out spatial cross-validation
+- Bootstrap confidence intervals for model evaluation
 
+Model features include demographic, socioeconomic, transportation, and environmental variables while excluding proximity features used to define the target outcome to reduce leakage.
 ### Food Desert Methods
 
 **USDA Food Access Research Atlas (FARA)**
