@@ -1,0 +1,60 @@
+    Hudson      16               2                   12.5         54.175166        12.664779          6.521503         1.024852                   0
+Gloucester      26               9                   34.6         52.995106         6.217092          7.724733         0.362028                   2
+    Warren      16               5                   31.2         52.564739        10.738282          2.348821         0.244105                   2
+ Middlesex      36              13                   36.1         52.560269         7.247145          4.711167         0.695969                   2
+  Atlantic      24               7                   29.2         51.835072         8.899148          6.431623         0.582871                   3
+   Passaic      27               8                   29.6         51.433853        12.432831          8.987420         1.940378                   2
+     Essex      31               7                   22.6         50.662084        12.948273          5.937180         0.775699                   0
+Burlington      34              11                   32.4         50.035362         6.984282          6.044805         0.460988                   3
+     Ocean      29               6                   20.7         49.530875         6.775051          4.826817         0.786553                   3
+ Hunterdon      20               5                   25.0         49.087919         3.964721          3.265899         0.327616                   2
+    Bergen      66              16                   24.2         48.685094         6.401674          6.916114         2.179749                   3
+     Union      26               3                   11.5         48.635925         7.694379          5.467379         0.973236                   0
+    Sussex      19               1                    5.3         47.203312         4.426735          3.839546         0.442189                   0
+    Mercer      22               5                   22.7         47.127740        13.978884          6.703530         0.903053                   1
+  Monmouth      49              11                   22.4         46.832753         5.236215          4.119919         0.556458                   7
+    Morris      50               6                   12.0         45.368835         6.682640          3.586283         0.566649                   2
+  Somerset      27               2                    7.4         44.502056         6.923465          3.871330         0.507737                   1
+  Cape May      16               4                   25.0         43.771488         7.043025          7.163259         1.425472                   3
+  → Saved: data/snap_wic_gap_by_county.csv  (21 rows)
+  → Saved: plots/32_snap_wic_gap_analysis.png
+  → Saved: plots/33_snap_wic_gap_county_heatmap.png
+
+════════════════════════════════════════════════════════════
+  SUMMARY
+════════════════════════════════════════════════════════════
+
+  ELDERLY ANALYSIS
+  ─────────────────────────────────────────────────────
+  Elderly-heavy ZIPs (≥19% elderly)    : 195
+  Critical risk elderly ZIPs                    : 44
+  data/elderly_critical_zips.csv
+  data/elderly_risk_tier_summary.csv
+  data/elderly_county_summary.csv
+  data/elderly_snap_wic_dual_gap.csv            ← elderly + SNAP/WIC overlap
+  plots/30_elderly_food_vulnerability.png
+  plots/31_elderly_health_by_risk_tier.png
+
+  SNAP / WIC GAP ANALYSIS
+  ─────────────────────────────────────────────────────
+  SNAP gap ZIPs                                 : 147
+  WIC gap ZIPs                                  : 147
+  Combined gap ZIPs                             : 147
+  Elderly + SNAP/WIC dual gap                   : 43
+  data/snap_wic_gap_ranked.csv
+  data/snap_wic_gap_by_county.csv
+  plots/32_snap_wic_gap_analysis.png
+  plots/33_snap_wic_gap_county_heatmap.png
+
+  DOLLAR STORE DEPENDENCE
+  ─────────────────────────────────────────────────────
+  data/dollar_store_currently_dominant.csv
+  data/dollar_store_tipping_point.csv
+  data/dollar_store_high_risk_both.csv
+  data/triple_risk_zips.csv                     ← highest priority targets
+  data/dollar_store_county_summary.csv
+  plots/34_dollar_store_dependence.png
+  plots/35_dollar_tipping_point_importance.png
+
+
+  → Word report saved: /content/Food_Access_NJ/data/targeted_analysis_report.docx

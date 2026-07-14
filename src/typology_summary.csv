@@ -1,5 +1,7 @@
 access_typology,pct_elderly,pct_poverty,median_income,pct_snap,pct_no_vehicle,pct_college,pct_transit
-Dollar Store Desert,15.0,14.4,83684.38,16.12,18.07,31.9,12.26
-Food Mirage,14.41,12.94,83426.75,12.94,20.11,35.37,14.17
-Food Swamp,17.13,9.74,102616.99,8.41,10.62,41.2,7.66
-True Desert,21.89,7.17,116981.8,3.85,5.46,41.6,3.15
+Desert-Swamp Overlap,18.49,10.11,92863.1,8.37,8.37,33.55,4.6
+Dollar Store Desert,18.97,13.52,73457.3,13.97,11.0,23.65,3.42
+Food Mirage,13.0,26.49,52300.89,24.86,32.51,21.35,16.15
+Food Swamp,18.42,5.92,121517.23,4.43,6.83,48.14,6.5
+True Desert,16.04,7.7,79671.0,8.71,6.86,24.39,1.45
+Well Served,22.06,8.06,128243.9,4.23,7.0,46.4,5.62

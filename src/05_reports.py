@@ -2,6 +2,7 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 import warnings
+from pipeline_utils import load_features_and_scores
 
 warnings.filterwarnings("ignore")
 
@@ -10,18 +11,15 @@ warnings.filterwarnings("ignore")
 # ═════════════════════════════════════════════════════════════════════════════
 
 ROOT_DIR  = Path(__file__).resolve().parent.parent
-DATA     = ROOT_DIR / "data"
-REPORTS  = ROOT_DIR / "reports"
+DATA      = ROOT_DIR / "data"
+REPORTS   = ROOT_DIR / "reports"
 REPORTS.mkdir(exist_ok=True)
 
-FEATURES_FILE  = DATA / "nj_zip_features_v5.csv"   # full feature set  ← primary
-
-SCORES_FILE    = DATA / "nj_zip_scores_1.csv"       # model predictions ← merged in
-FI_FILE        = DATA / "model_feature_importance.csv"
-META_FILE      = DATA / "pipeline_metadata.json"
-BOOT_FILE      = DATA / "bootstrap_metrics.csv"
-THRESH_FILE    = DATA / "threshold_tuning.csv"
-SCV_FILE       = DATA / "spatial_cv_results.csv"
+FI_FILE     = DATA / "model_feature_importance.csv"
+META_FILE   = DATA / "pipeline_metadata.json"
+BOOT_FILE   = DATA / "bootstrap_metrics.csv"
+THRESH_FILE = DATA / "threshold_tuning.csv"
+SCV_FILE    = DATA / "spatial_cv_results.csv"
 
 # ═════════════════════════════════════════════════════════════════════════════
 # LOAD  — base features from v5, model predictions from scores_1
@@ -30,36 +28,7 @@ print("\n" + "═" * 60)
 print("  NJ FOOD ACCESS REPORT GENERATOR")
 print("═" * 60)
 
-FEATURES_FILE = DATA / "nj_zip_features_v5.csv"
-SCORES_FILE   = DATA / "nj_zip_scores_1.csv"
-MODEL_FEATURE_IMPORTANCE = DATA / "model_feature_importance.csv"
-
-# Load fully-engineered feature file (has county, municipality, all flags)
-df = pd.read_csv(FEATURES_FILE, dtype={"zip": str})
-df["zip"] = df["zip"].astype(str).str.zfill(5)
-print(f"\n  Features : {len(df):,} rows × {len(df.columns):,} columns  ({FEATURES_FILE.name})")
-
-# Load model scores and pull in only the predicted/model columns
-if SCORES_FILE.exists():
-    scores = pd.read_csv(SCORES_FILE, dtype={"zip": str})
-    scores["zip"] = scores["zip"].astype(str).str.zfill(5)
-
-    pred_cols = [c for c in scores.columns if c.startswith("predicted_") or c.startswith("typo_prob_")]
-    model_meta_cols = ["desert_probability", "predicted_desert", "predicted_desert_tuned", "predicted_typology"]
-    model_meta_cols = [c for c in model_meta_cols if c in scores.columns]
-
-    cols_to_merge = ["zip"] + model_meta_cols + pred_cols
-    cols_to_merge = [c for c in cols_to_merge if c in scores.columns]
-
-    # Only bring in columns that don't already exist in df
-    new_cols = [c for c in cols_to_merge if c not in df.columns or c == "zip"]
-    df = df.merge(scores[new_cols], on="zip", how="left")
-
-    print(f"  Scores   : merged {len(new_cols)-1} model columns from {SCORES_FILE.name}")
-else:
-    print(f"  Scores   : {SCORES_FILE.name} not found — model prediction sections will be skipped")
-
-print(f"  Combined : {len(df):,} rows × {len(df.columns):,} columns")
+df = load_features_and_scores(DATA)
 
 # ═════════════════════════════════════════════════════════════════════════════
 # GUARDS — fail fast with a clear message if key columns are missing
@@ -80,7 +49,6 @@ if missing:
     )
 
 print("  Columns : all required columns present ✓")
-
 # ═════════════════════════════════════════════════════════════════════════════
 # HELPERS
 # ═════════════════════════════════════════════════════════════════════════════
@@ -134,6 +102,7 @@ statewide = {
     "pct_no_vehicle_avg"           : f"{round(df['pct_no_vehicle'].mean(), 1)}%",
     "pct_elderly_avg"              : f"{round(df['pct_elderly'].mean(), 1)}%",
     "avg_composite_vuln_index"     : round(df["composite_vuln_index"].mean(), 1),
+    "pct_food_desert_consensus": f"{pct(df['is_desert_consensus'])}%",
 }
 
 print()

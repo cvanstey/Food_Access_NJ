@@ -575,54 +575,54 @@ snap_nj = snap_df[snap_df[state_col].str.strip().str.upper() == "NJ"].copy()
 print(f"  ✔ NJ SNAP retailers: {len(snap_nj):,} stores")
 print(snap_nj.head(3).to_string(index=False))
 
-# ── 9. NJEDA Designated Food Desert Communities ───────────────────────────────
-
-section("9 of 9 — NJEDA Designated Food Desert Communities")
-
-print(f"  Extracting NJEDA food desert table from: {NJEDA_PDF_PATH}")
-
-njeda_rows      = []
-
-with pdfplumber.open(NJEDA_PDF_PATH) as pdf:
-    print(f"  Total pages: {len(pdf.pages)}")
-    for page_num in [9, 10]:
-        page = pdf.pages[page_num]
-        for table in page.extract_tables():
-            for row in table:
-                if row and any(row):
-                    njeda_rows.append(row)
-
-njeda_df = pd.DataFrame(njeda_rows)
-print(f"  Raw rows extracted: {len(njeda_df)}")
-print(njeda_df.head(6).to_string(index=False))
-
-
-def clean_njeda(df: pd.DataFrame) -> pd.DataFrame:
-    raw_text     = df.iloc[0, 0]
-    county_names = "|".join(NJ_COUNTIES)
-    pattern      = (
-        r"(\d{1,2})\s+([\w ,/\*\-]+?)\s+"
-        rf"({county_names})\s+([\d.]+)\s+([\d,]+)"
-    )
-    rows = []
-    for m in re.findall(pattern, raw_text):
-        rank, name, county, score, pop = m
-        rows.append({
-            "rank":       int(rank),
-            "name":       name.strip().rstrip("*"),
-            "asterisk":   "*" in name,
-            "county":     county.strip(),
-            "score":      float(score),
-            "population": int(pop.replace(",", "")),
-        })
-    return pd.DataFrame(rows).sort_values("rank").reset_index(drop=True)
-
-
-njeda_clean = clean_njeda(njeda_df)
-print(njeda_clean.to_string(index=False))
-print(f"\n  ✔ {len(njeda_clean)} food desert communities extracted")
-njeda_clean.to_csv(DATA_DIR / "njeda_communities.csv", index=False)
-print("  Saved → data/njeda_communities.csv")
+# # ── 9. NJEDA Designated Food Desert Communities ───────────────────────────────
+#
+# section("9 of 9 — NJEDA Designated Food Desert Communities")
+#
+# print(f"  Extracting NJEDA food desert table from: {NJEDA_PDF_PATH}")
+#
+# njeda_rows      = []
+#
+# with pdfplumber.open(NJEDA_PDF_PATH) as pdf:
+#     print(f"  Total pages: {len(pdf.pages)}")
+#     for page_num in [10, 11]:
+#         page = pdf.pages[page_num]
+#         for table in page.extract_tables():
+#             for row in table:
+#                 if row and any(row):
+#                     njeda_rows.append(row)
+#
+# njeda_df = pd.DataFrame(njeda_rows)
+# print(f"  Raw rows extracted: {len(njeda_df)}")
+# print(njeda_df.head(6).to_string(index=False))
+#
+#
+# def clean_njeda(df: pd.DataFrame) -> pd.DataFrame:
+#     raw_text     = df.iloc[0, 0]
+#     county_names = "|".join(NJ_COUNTIES)
+#     pattern      = (
+#         r"(\d{1,2})\s+([\w ,/\*\-]+?)\s+"
+#         rf"({county_names})\s+([\d.]+)\s+([\d,]+)"
+#     )
+#     rows = []
+#     for m in re.findall(pattern, raw_text):
+#         rank, name, county, score, pop = m
+#         rows.append({
+#             "rank":       int(rank),
+#             "name":       name.strip().rstrip("*"),
+#             "asterisk":   "*" in name,
+#             "county":     county.strip(),
+#             "score":      float(score),
+#             "population": int(pop.replace(",", "")),
+#         })
+#     return pd.DataFrame(rows).sort_values("rank").reset_index(drop=True)
+#
+#
+# njeda_clean = clean_njeda(njeda_df)
+# print(njeda_clean.to_string(index=False))
+# print(f"\n  ✔ {len(njeda_clean)} food desert communities extracted")
+# njeda_clean.to_csv(DATA_DIR / "njeda_communities.csv", index=False)
+# print("  Saved → data/njeda_communities.csv")
 
 # ── 10. USDA FARA Food Access Research Atlas ─────────────────────────────────
 

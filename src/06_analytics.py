@@ -45,6 +45,8 @@ sns = _sns_module  # avoids alias shadowing by local variables named 'sns'
 from scipy import stats
 from scipy.stats import kruskal, mannwhitneyu, spearmanr
 
+from pipeline_utils import load_features_and_scores
+
 warnings.filterwarnings("ignore")
 
 # ── Configuration ─────────────────────────────────────────────────────────────
@@ -58,6 +60,10 @@ PLOTS_DIR.mkdir(parents=True, exist_ok=True)
 
 FEATURES_FILE = DATA_DIR / "nj_zip_features_v5.csv"
 SCORES_FILE   = DATA_DIR / "nj_zip_scores_1.csv"
+
+
+print("\nLoading dataset...")
+df = load_features_and_scores(DATA_DIR)
 
 # Colour palette — consistent across all figures
 PALETTE = {
@@ -527,7 +533,6 @@ if "income_tertile" in df.columns and STORE_TYPES:
     plt.close()
     print("  Saved → plots/11_store_equity_income.png")
 
-# ── By dominant racial group (majority-minority vs. majority-white) ──────────
 if "Population Non-Hispanic White" in df.columns and "population" in df.columns:
     df["pct_white"] = df["Population Non-Hispanic White"] / df["population"].replace(0, np.nan)
     df["majority_group"] = np.where(df["pct_white"] >= 0.60, "Majority White",
@@ -734,6 +739,168 @@ if len(HEALTH_OUTCOMES) >= 4:
     plt.close()
     print("  Saved → plots/15_dual_burden_health.png")
 
+
+# What % of NJ's ELDERLY POPULATION lives in each burden category?
+if "population" in df.columns and "pct_elderly" in df.columns:
+    df["elderly_population"] = df["population"] * (df["pct_elderly"] / 100)
+    total_elderly_pop = df["elderly_population"].sum()
+
+    for label, mask in BURDEN_GROUPS.items():
+        elderly_in_group = df.loc[mask, "elderly_population"].sum()
+        pct_of_all_elderly = elderly_in_group / total_elderly_pop * 100
+        print(f"  {label:15s}: {elderly_in_group:,.0f} elderly residents "
+              f"({pct_of_all_elderly:.1f}% of all NJ elderly)")
+
+
+
+# What % of NJ's elderly population lives in each burden category?
+if "population" in df.columns and "pct_elderly" in df.columns:
+
+    df["elderly_population"] = (
+        df["population"] * (df["pct_elderly"] / 100)
+    )
+
+    total_elderly_pop = df["elderly_population"].sum()
+
+    for label, mask in BURDEN_GROUPS.items():
+
+        elderly_in_group = df.loc[mask, "elderly_population"].sum()
+        total_pop_in_group = df.loc[mask, "population"].sum()
+
+        # Share of all NJ elderly living in this burden category
+        pct_of_all_elderly = (
+            elderly_in_group / total_elderly_pop * 100
+        )
+
+        # Elderly rate within the burden category
+        elderly_rate = (
+            elderly_in_group / total_pop_in_group * 100
+            if total_pop_in_group > 0 else 0
+        )
+
+        print(
+            f"{label:15s}: "
+            f"{elderly_in_group:,.0f} elderly residents "
+            f"({pct_of_all_elderly:.1f}% of all NJ elderly) | "
+            f"Elderly rate: {elderly_rate:.1f}%"
+        )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SECTION 9B — Most Impacted Population Analysis
+#   For each demographic group, compare their share of each burden category
+#   (raw representation) against their "rate" within that category (density),
+#   then flag which groups are most DISPROPORTIONATELY concentrated in the
+#   worst outcome — Dual Burden — relative to their statewide baseline.
+# ─────────────────────────────────────────────────────────────────────────────
+
+section("SECTION 9B — Most Impacted Population Analysis")
+
+DEMO_COLS = {
+    "Elderly":        ("pct_elderly", "pct"),
+    "Below Poverty":  ("pct_poverty", "pct"),
+    "No Vehicle":     ("pct_no_vehicle", "pct"),
+    "SNAP Recipient": ("pct_snap", "pct"),
+
+    "Black":          ("Population Black or African American", "count"),
+    "Hispanic":       ("Population Hispanic (Race Universe)", "count"),
+    "Asian":          ("Population Asian Alone", "count"),
+    "White":          ("Population White Alone", "count"),
+}
+
+DEMO_COLS = {
+    k: v for k, v in DEMO_COLS.items()
+    if v[0] in df.columns
+}
+
+impact_rows = []
+
+for label, (col, col_type) in DEMO_COLS.items():
+
+    if col_type == "pct":
+        group_population = df["population"] * (df[col] / 100)
+    else:
+        group_population = df[col]
+
+    statewide_group_pop = group_population.sum()
+    statewide_total_pop = df["population"].sum()
+
+    statewide_rate = (
+        statewide_group_pop / statewide_total_pop * 100
+        if statewide_total_pop > 0 else np.nan
+    )
+
+    for burden_label, mask in BURDEN_GROUPS.items():
+
+        group_pop_in_burden = group_population[mask].sum()
+        total_pop_in_burden = df.loc[mask, "population"].sum()
+
+        rate_in_burden = (
+            group_pop_in_burden / total_pop_in_burden * 100
+            if total_pop_in_burden > 0 else np.nan
+        )
+
+        pct_of_statewide_group = (
+            group_pop_in_burden / statewide_group_pop * 100
+            if statewide_group_pop > 0 else np.nan
+        )
+
+        concentration_ratio = (
+            rate_in_burden / statewide_rate
+            if statewide_rate > 0 else np.nan
+        )
+
+        impact_rows.append({
+            "demographic": label,
+            "burden_group": burden_label,
+            "pop_in_group": round(group_pop_in_burden),
+            "pct_of_all_this_demo": round(pct_of_statewide_group, 1),
+            "rate_within_burden": round(rate_in_burden, 1),
+            "statewide_baseline_rate": round(statewide_rate, 1),
+            "concentration_ratio": round(concentration_ratio, 2),
+        })
+
+impact_df = pd.DataFrame(impact_rows)
+impact_df.to_csv(DATA_DIR / "most_impacted_population.csv", index=False)
+
+print("\n  Concentration ratio > 1.0 = over-represented in that burden group")
+print("  relative to their statewide baseline share (higher = more impacted)\n")
+
+dual_burden_ranked = (
+    impact_df[impact_df["burden_group"] == "Dual Burden"]
+    .sort_values("concentration_ratio", ascending=False)
+)
+
+print("  Ranked by concentration in DUAL BURDEN (worst category):\n")
+print(
+    dual_burden_ranked[
+        [
+            "demographic",
+            "pop_in_group",
+            "rate_within_burden",
+            "statewide_baseline_rate",
+            "concentration_ratio",
+        ]
+    ].to_string(index=False)
+)
+
+print("\n  Saved → data/most_impacted_population.csv")
+
+
+# Create elderly population once
+df["elderly_population"] = (
+    df["population"] * df["pct_elderly"] / 100
+)
+
+print("\nElderly share by burden category:")
+for burden_label, mask in BURDEN_GROUPS.items():
+
+    elderly_rate = (
+        df.loc[mask, "elderly_population"].sum() /
+        df.loc[mask, "population"].sum() * 100
+    )
+
+    print(f"{burden_label:12s}: {elderly_rate:.1f}% elderly")
 # ─────────────────────────────────────────────────────────────────────────────
 # SECTION 10  Spatial Isolation × Socioeconomic Vulnerability 2×2 Matrix
 # ─────────────────────────────────────────────────────────────────────────────
@@ -892,12 +1059,16 @@ if "population" in df.columns:
 
 section("SECTION 13 — Racial Equity: Store Access Disparities")
 
+# ── Race/ethnicity percentages (moved earlier so Section 9B can use them) ──
 RACE_COLS = {
     "pct_black":    "Population Non-Hispanic Black",
-    "pct_hispanic": "Population Hispanic or Latino",
+    "pct_hispanic": "Population Hispanic (Race Universe)",
     "pct_asian":    "Population Non-Hispanic Asian",
     "pct_white":    "Population Non-Hispanic White",
 }
+for new_col, src_col in RACE_COLS.items():
+    if src_col in df.columns and "population" in df.columns:
+        df[new_col] = df[src_col] / df["population"].replace(0, np.nan)
 
 for new_col, src_col in RACE_COLS.items():
     if src_col in df.columns and "population" in df.columns:

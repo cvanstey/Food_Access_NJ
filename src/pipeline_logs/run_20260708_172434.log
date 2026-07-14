@@ -1,6 +1,6 @@
 
 ======================================================================
-01_load_data.py — started 2026-07-08T16:55:20.242803
+01_load_data.py — started 2026-07-08T17:24:34.397226
 ======================================================================
 No Census API key found. Using the public API (may be slower).
 26
@@ -89,9 +89,9 @@ Response (first 1000 characters):
 </html>
 
 ======================================================================
-
+[0m
 ======================================================================
-02a_nearest.py — started 2026-07-08T16:55:26.665382
+02a_nearest.py — started 2026-07-08T17:24:43.506461
 ======================================================================
 Skipped 2 out-of-state nodes
 Kept:   {'fast_food': 8896, 'convenience': 5202, 'supermarket': 2208}
@@ -201,7 +201,7 @@ All columns:
    20  nearest_supermarket_miles
 
 ======================================================================
-02b_merge_sources.py — started 2026-07-08T16:55:28.383197
+02b_merge_sources.py — started 2026-07-08T17:24:45.166450
 ======================================================================
 
 ── 0. Loading OSM data
@@ -444,7 +444,7 @@ All columns:
   147  pop_density
 
 ======================================================================
-02c_clean_NJ_features_zip2.py — started 2026-07-08T16:55:35.870551
+02c_clean_NJ_features_zip2.py — started 2026-07-08T17:24:52.181874
 ======================================================================
 
 =================================================================
@@ -879,7 +879,7 @@ Int64        6
 
 
 ======================================================================
-03_features.py — started 2026-07-08T16:55:36.847059
+03_features.py — started 2026-07-08T17:24:53.058563
 ======================================================================
 ['zip', 'bakery', 'convenience', 'deli', 'farm_stand', 'farmers_market', 'fast_food', 'grocery', 'health_food', 'meat_seafood', 'pharmacy', 'produce_market', 'restaurant', 'supermarket', 'dollar_store', 'wholesale', 'liquor_store', 'bar', 'Median Household Income_acs', 'Total Population_acs', 'Median Age_acs', 'Population Below Poverty_acs', 'Population Poverty Universe', 'Households on SNAP_acs', 'Households SNAP Universe', 'Households No Vehicle_acs', 'Households Vehicle Universe', 'Total Workers Commuting', 'Workers Using Public Transit_acs', 'Total Occupied Housing Units', 'Owner-Occupied Housing Units', 'Population High School Graduate', "Population Bachelor's Degree", "Population Master's Degree", 'Population Professional Degree', 'Population Doctorate Degree', 'Population Education Universe', 'Population White Alone', 'Population Black or African American', 'Population Asian Alone', 'Population Non-Hispanic White', 'Population Non-Hispanic Black', 'Population Non-Hispanic Asian', 'Population Hispanic (Race Universe)', 'Population Race/Ethnicity Universe', 'Median Contract Rent', 'Median Home Value', 'Single-Parent Female Households', 'Total Households', 'Households with Public Assistance Income', 'Households Public Assistance Universe', 'Households No Internet Access', 'Households Internet Universe', 'Households Rent 40-49% of Income', 'Households Rent 50%+ of Income', 'Households Rent Burden Universe', 'Vacant Housing Units', 'Total Housing Units', 'Civilian Unemployed', 'Civilian Labor Force Universe', 'Male Population 65-66', 'Male Population 67-69', 'Male Population 70-74', 'Male Population 75-79', 'Male Population 80-84', 'Male Population 85+', 'Female Population 65-66', 'Female Population 67-69', 'Female Population 70-74', 'Female Population 75-79', 'Female Population 80-84', 'Female Population 85+', 'pct_poverty', 'pct_snap', 'pct_no_vehicle', 'pct_elderly', 'pct_transit', 'PLACES Total Population', 'PLACES Population 18+', 'No Health Insurance % (Adults 18-64)', 'Arthritis % (Adults)', 'Binge Drinking % (Adults)', 'High Blood Pressure % (Adults)', 'Taking BP Medication % (Adults)', 'Cancer (Excl. Skin) % (Adults)', 'Current Asthma % (Adults)', 'Coronary Heart Disease % (Adults)', 'Annual Checkup % (Adults)', 'Cholesterol Screening % (Adults)', 'Colorectal Cancer Screening % (Adults)', 'COPD % (Adults)', 'Current Smoking % (Adults)', 'Dental Visit % (Adults)', 'Depression % (Adults)', 'Diabetes % (Adults)', 'Good or Better Health % (Adults)', 'High Cholesterol % (Adults)', 'Physical Inactivity % (Adults)', 'Mammography Use % (Women)', 'Poor Mental Health % (Adults)', 'Obesity % (Adults)', 'Poor Physical Health % (Adults)', 'Short Sleep Duration % (Adults)', 'Stroke % (Adults)', 'Teeth Lost % (Adults 65+)', 'Hearing Disability % (Adults)', 'Vision Disability % (Adults)', 'Cognitive Disability % (Adults)', 'Mobility Disability % (Adults)', 'Self-Care Disability % (Adults)', 'Independent Living Disability % (Adults)', 'Any Disability % (Adults)', 'Social Isolation/Loneliness % (Adults)', 'SNAP/Food Stamp Use % (Adults)', 'Food Insecurity % (Adults)', 'Housing Insecurity % (Adults)', 'Utility Shutoff Risk % (Adults)', 'Lack of Transportation % (Adults)', 'Lack of Emotional Support % (Adults)', 'Geolocation', 'county', 'county_fips', 'municipality', 'nj_mun_code', 'mcd_geoid', 'pct_zip_in_municipality', 'pct_municipality_in_zip', 'snap_stores', 'snap_supermarkets', 'wic_stores', 'usda_lila_1_10', 'usda_lila_half_10', 'usda_lila_1_20', 'usda_la_1_10', 'usda_la_half_10', 'usda_lapop_1_10', 'usda_lapop_half_10', 'usda_poverty_rate', 'usda_median_income', 'usda_urban', 'usda_pop2010', 'nearest_fastfood_miles', 'nearest_convenience_miles', 'nearest_supermarket_miles', 'state_county_fips', 'mRFEI_wic', 'area_sqmi', 'pop_density', 'longitude', 'latitude']
 
@@ -1135,7 +1135,7 @@ All columns:
 188  desert_subtype
 
 ======================================================================
-04_model.py — started 2026-07-08T16:55:37.782971
+04_model.py — started 2026-07-08T17:24:53.906245
 ======================================================================
 
 ============================================================
@@ -1878,7 +1878,7 @@ Food Swamp                 17.13         9.74      102616.99      8.41          
 True Desert                21.89         7.17      116981.80      3.85            5.46        41.60         3.15
 
 ======================================================================
-05_reports.py — started 2026-07-08T16:56:36.721449
+05_reports.py — started 2026-07-08T17:26:08.229650
 ======================================================================
 
 ════════════════════════════════════════════════════════════
@@ -2413,7 +2413,7 @@ deserts  3.8000  2.9081
 
 
 ======================================================================
-06_analytics.py — started 2026-07-08T16:56:37.716229
+06_analytics.py — started 2026-07-08T17:26:09.309389
 ======================================================================
 
 Loading dataset...
@@ -2902,7 +2902,7 @@ Income Tertile             Depression  41.279  0.00000 ***  0.0701
 
 
 ======================================================================
-../testing/compare_density.py — started 2026-07-08T16:56:47.159857
+../testing/compare_density.py — started 2026-07-08T17:26:21.677286
 ======================================================================
 Loaded: 598 zips × 189 columns
 
@@ -3057,7 +3057,7 @@ weighted avg      0.958     0.956     0.950       113
 
 
 ======================================================================
-07_targeted_analysis.py — started 2026-07-08T16:57:03.287210
+07_targeted_analysis.py — started 2026-07-08T17:26:44.930476
 ======================================================================
 
 ════════════════════════════════════════════════════════════
@@ -3332,18 +3332,3 @@ Burlington      34              11                   32.4         50.035362     
 
 
   → Word report saved: C:\Users\crook\PROJECTS\NJ_Food_Access\data\targeted_analysis_report.docx
-
-======================================================================
-08_zip_lookup.py — started 2026-07-08T16:57:08.446236
-======================================================================
-Loading lookup tables...
-Ready.
-
-Enter ZIP (q to quit)
-
-ZIP > Traceback (most recent call last):
-  File "C:\Users\crook\PROJECTS\NJ_Food_Access\src\08_zip_lookup.py", line 262, in <module>
-    z = input("ZIP > ").strip()
-        ~~~~~^^^^^^^^^^
-  File "<frozen codecs>", line 322, in decode
-KeyboardInterrupt

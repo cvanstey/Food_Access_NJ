@@ -30,7 +30,7 @@ Validation
 
 Outputs
 -------
-  data/nj_zip_scores1.csv          — all zips scored (primary deliverable)
+  data/nj_zip_scores_1.csv          — all zips scored (primary deliverable)
   data/model_feature_importance.csv
   data/health_importance_{outcome}.csv
   data/pipeline_metadata.json
@@ -1361,7 +1361,7 @@ from scipy.stats import ttest_ind
 section("FINAL SUMMARY")
 
 print(f"Best desert model  : {best_name_b}")
-print(f"Test AUC           : {best_result['test_auc']:.3f}")  # remove "Var B"
+print(f"Test AUC           : {best_result['test_auc']:.3f}")
 print(f"CV AUC             : {best_result['cv_mean']:.3f} ± {best_result['cv_std']:.3f}")
 print(f"Spatial CV AUC     : {spatial_auc:.3f}")
 print(f"Best threshold     : {best_thresh:.2f}")

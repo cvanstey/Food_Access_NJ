@@ -5,6 +5,37 @@ import warnings
 
 warnings.filterwarnings("ignore")
 
+# ═════════════════════════════════════════════════════════════════════════════
+# PATCH NOTES (this file vs. your last version)
+# ═════════════════════════════════════════════════════════════════════════════
+# 1. classify() had no catch-all. A ZIP with a supermarket, no swamp signal,
+#    and no mirage signal matched none of the four branches and silently
+#    returned None. Any later .dropna() would drop these rows from the
+#    typology model without surfacing that it happened. Fixed by adding an
+#    explicit "Well Served" category — see section 6.
+#
+# 2. Food Mirage was defined TWICE with different logic:
+#      classify():        poverty > 20  OR  no_vehicle > 10
+#      is_food_mirage col: poverty > 20  AND no_vehicle > 10
+#    Same thresholds now, but OR vs AND still disagree on any ZIP where
+#    exactly one of the two conditions is true. Fixed by computing
+#    is_food_mirage ONCE (moved up to section 5.5, before classify() needs
+#    it) and having classify() read that column instead of recomputing its
+#    own version. There is now exactly one Food Mirage definition in the file.
+#    NOTE: I kept AND logic (matches the comment "poverty + no-vehicle make
+#    it effectively inaccessible" — reads as both conditions required). If
+#    you actually want OR, change the single `&` to `|` in section 5.5 —
+#    that's now the only place this logic lives.
+#
+# 3. Removed a dead early assignment `df["is_food_desert"] = df["usda_desert_flag"]`
+#    that was immediately overwritten later by `df["is_food_desert"] = df["is_desert_5mi"]`.
+#    Kept only the final, intended assignment, with the alternates left
+#    commented for easy swapping.
+#
+# 4. Removed a duplicated block (median_income / population /
+#    supermarkets_within_5mi / pct_college was computed twice, identically).
+# ═════════════════════════════════════════════════════════════════════════════
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Paths
 # ─────────────────────────────────────────────────────────────────────────────
@@ -19,6 +50,8 @@ print(df.columns.tolist())
 print(f"\n── Loaded: {df.shape[0]} zips × {df.shape[1]} columns")
 
 # ── Filter to NJ zips only ──────────────────────────────────────────────
+# NJ zip codes are 07xxx–08xxx. Non-NJ zips (NY/PA border contamination)
+# were leaking in from an upstream spatial join/buffer.
 n_before = len(df)
 df = df[df["zip"].str.startswith(("07", "08"))].reset_index(drop=True)
 n_after = len(df)
@@ -53,17 +86,22 @@ if "wic_stores" not in df.columns:
 # ═════════════════════════════════════════════════════════════════════════════
 # 1. RFEI
 # ═════════════════════════════════════════════════════════════════════════════
+# Standard FSR — matches Cooksey-Stowers (2017)
 df["rfei"] = safe_div(
     df["fast_food"] + df["convenience"],
     df["supermarket"] + df["grocery"] + df["produce_market"],
     fill=np.nan
 ).round(3)
 
+# Extended FSR — adds dollar stores
 df["rfei_full"] = safe_div(
     df["fast_food"] + df["convenience"] + df["dollar_store"],
     df["supermarket"] + df["grocery"] + df["produce_market"],
     fill=np.nan
 ).round(3)
+
+df["is_swamp_rfei"] = (df["rfei"] > 3.0).astype(int)
+
 
 # ═════════════════════════════════════════════════════════════════════════════
 # 2. mRFEI
@@ -97,20 +135,23 @@ df["low_mrfei_share_wic"] = ((df["mrfei_wic"] >= 0) & (df["mrfei_wic"] < 33)).as
 
 df["mrfei_gap"] = (df["mrfei"] - df["mrfei_wic"]).replace([np.inf, -np.inf], np.nan)
 
-# # ═════════════════════════════════════════════════════════════════════════════
-# # 4. NJ Swamp Score
-# # ═════════════════════════════════════════════════════════════════════════════
-# df["nj_swamp_score_raw"] = safe_div(
-#     df["nearest_fastfood_miles"].clip(lower=0.1),
-#     df["nearest_supermarket_miles"].clip(lower=0.1),
-#     fill=np.nan
-# )
-#
-# df["nj_swamp_score"] = (
-#     (1 - df["nj_swamp_score_raw"].rank(pct=True)) * 100
-# ).round(1)
-#
-# df["is_swamp_nj"] = (df["nj_swamp_score"] >= 75).astype(int)
+# ═════════════════════════════════════════════════════════════════════════════
+# 4. NJ Swamp Score  (distance ratio method — matches NJ DCA definition)
+#    Formula: nearest swamp outlet / nearest supermarket, scaled 0–100
+#    High score = swamp is closer than supermarket = worse access
+# ═════════════════════════════════════════════════════════════════════════════
+df["nj_swamp_score_raw"] = safe_div(
+    df["nearest_fastfood_miles"].clip(lower=0.1),
+    df["nearest_supermarket_miles"].clip(lower=0.1),
+    fill=np.nan
+)
+
+# Invert rank so high score = worse (swamp much closer than supermarket)
+df["nj_swamp_score"] = (
+    (1 - df["nj_swamp_score_raw"].rank(pct=True)) * 100
+).round(1)
+
+df["is_swamp_nj"] = (df["nj_swamp_score"] >= 75).astype(int)
 
 # ═════════════════════════════════════════════════════════════════════════════
 # 5. Dollar stores
@@ -126,10 +167,12 @@ df["dollar_store_desert"]    = ((df["dollar_store"] > 0) & (df["supermarket"] ==
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# 5.5  Food Mirage
+# 5.5  Food Mirage — SINGLE definition, computed once, used everywhere below.
+#      (Previously duplicated with disagreeing logic inside classify() —
+#      see PATCH NOTES item 2.)
 # ═════════════════════════════════════════════════════════════════════════════
-POVERTY_MIRAGE_THRESH    = 20
-NO_VEHICLE_MIRAGE_THRESH = 10
+POVERTY_MIRAGE_THRESH    = 20   # % poverty
+NO_VEHICLE_MIRAGE_THRESH = 10   # % no-vehicle households
 
 df["is_food_mirage"] = (
     (df["supermarket"] > 0)
@@ -137,13 +180,63 @@ df["is_food_mirage"] = (
     & (df["pct_no_vehicle"] > NO_VEHICLE_MIRAGE_THRESH)
 ).astype(int)
 
+
+# ═════════════════════════════════════════════════════════════════════════════
+# 6. Access Typology
+# ═════════════════════════════════════════════════════════════════════════════
+def classify(row):
+    """
+    Assigns exactly one of five categories to every ZIP. Order matters —
+    each condition is checked only if the ones above it fail.
+
+        1. True Desert          no supermarket, nearest >= 1 mile away
+        2. Food Swamp            has supermarket, RFEI > 3.0
+        3. Food Mirage            has supermarket, is_food_mirage == 1
+                                   (poverty > 20% AND no-vehicle > 10%,
+                                   single definition — see section 5.5)
+        4. Dollar Store Desert   no supermarket, dollar stores present and
+                                   outnumber supermarkets
+        5. Well Served           catch-all: none of the above hold (has
+                                   supermarket and isn't a swamp/mirage; or
+                                   no supermarket but nearby (<1mi) and not
+                                   dollar-store dominated)
+    """
+    has_super  = row["supermarket"] > 0
+    far        = row["nearest_supermarket_miles"] >= 1
+    swamp      = row["is_swamp_rfei"] == 1
+    is_mirage  = row["is_food_mirage"] == 1
+    dollar_dom = row["dollar_store_dominance"] == 1
+
+    if not has_super and far:
+        return "True Desert"
+    if has_super and swamp:
+        return "Food Swamp"
+    if has_super and is_mirage:
+        return "Food Mirage"
+    if not has_super and dollar_dom:
+        return "Dollar Store Desert"
+    return "Well Served"
+
+
+df["access_typology"] = df.apply(classify, axis=1)
+
+# ── Diagnostic: confirm no ZIP falls through unclassified ──────────────────
+n_unclassified = df["access_typology"].isna().sum()
+print(f"\n── Typology classification check")
+print(f"  Unclassified ZIPs (should be 0): {n_unclassified}")
+print(df["access_typology"].value_counts(dropna=False).to_string())
+
+
 # ═════════════════════════════════════════════════════════════════════════════
 # 7. Vulnerability scores
 # ═════════════════════════════════════════════════════════════════════════════
+
+# ── rfei null handling ────────────────────────────────────────────────────
+# NaN means no food retailers at all — treat as worst case, not best
 rfei_median = df["rfei"].median()
 
-df["rfei_imputed"] = df["rfei"].fillna(df["rfei"].max())
-df["rfei_no_data"] = df["rfei"].isna().astype(int)
+df["rfei_imputed"] = df["rfei"].fillna(df["rfei"].max())   # no retailers = worst rfei
+df["rfei_no_data"] = df["rfei"].isna().astype(int)         # flag for transparency
 
 df["transportation_vuln_score"] = (
     pct_rank_norm(df["pct_no_vehicle"])                        * 0.35
@@ -175,47 +268,44 @@ df["composite_vuln_index"] = (
 # ═════════════════════════════════════════════════════════════════════════════
 # 9. USDA Desert Flag
 # ═════════════════════════════════════════════════════════════════════════════
-# urban = df["pop_density"] >= 1000
-# rural = ~urban
-#
-# df["usda_desert_flag"] = (
-#     (df["pct_poverty"] >= 20)
-#     & (
-#         (urban & (df["nearest_supermarket_miles"] >= 1))
-#         | (rural & (df["nearest_supermarket_miles"] >= 10))
-#     )
-# ).astype(int)
+urban = df["pop_density"] >= 1000
+rural = ~urban
 
-# ═════════════════════════════════════════════════════════════════════════════
-# 9. USDA / FARA Desert Flags — two distinct LILA threshold variants
-# ═════════════════════════════════════════════════════════════════════════════
-# LILA 1/10: low income + low access at 1mi (urban) / 10mi (rural) — standard measure
-df["is_desert_fara"] = (df["usda_lila_1_10"].fillna(0) == 1).astype(int)
-
-# LILA 1/20: low income + low access at 1mi (urban) / 20mi (rural) — stricter rural threshold
-df["is_desert_usda"] = (df["usda_lila_1_20"].fillna(0) == 1).astype(int)
+df["usda_desert_flag"] = (
+    (df["pct_poverty"] >= 20)
+    & (
+        (urban & (df["nearest_supermarket_miles"] >= 1))
+        | (rural & (df["nearest_supermarket_miles"] >= 10))
+    )
+).astype(int)
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# 10. Swamp flags — all three methods
+# 10. Swamp flags — all four methods
 # ═════════════════════════════════════════════════════════════════════════════
 df["swamp_rfei_flag"]     = (df["rfei"] > 3.0).astype(int)
 df["swamp_mrfei_flag"]    = ((df["mrfei"] >= 0) & (df["mrfei"] < 33)).astype(int)
 df["swamp_mrfei_wic_flag"]= ((df["mrfei_wic"] >= 0) & (df["mrfei_wic"] < 33)).astype(int)
-#df["swamp_nj_flag"]       = (df["nj_swamp_score"] >= 75).astype(int)
+df["swamp_nj_flag"]       = (df["nj_swamp_score"] >= 75).astype(int)
 
 df["swamp_method_count"]    = (
     df["swamp_rfei_flag"]
     + df["swamp_mrfei_flag"]
     + df["swamp_mrfei_wic_flag"]
+    + df["swamp_nj_flag"]
 )
 df["is_swamp_consensus"]    = (df["swamp_method_count"] >= 2).astype(int)
-df["swamp_score_continuous"]= (df["swamp_method_count"] / 3).round(3)
+df["swamp_score_continuous"]= (df["swamp_method_count"] / 4).round(3)
+
+print("\n── Swamp flag totals across all ZIPs")
+print(df[["swamp_rfei_flag", "swamp_mrfei_flag", "swamp_mrfei_wic_flag", "swamp_nj_flag"]].sum())
+
 
 # ═════════════════════════════════════════════════════════════════════════════
 # 11. Per-ZIP method comparison functions
 # ═════════════════════════════════════════════════════════════════════════════
 def explain_zip(zip_code: str, df: pd.DataFrame):
+    """Print a detailed method-by-method breakdown for a single ZIP."""
     row = df[df["zip"] == zip_code]
     if row.empty:
         print(f"ZIP {zip_code} not found.")
@@ -232,7 +322,7 @@ def explain_zip(zip_code: str, df: pd.DataFrame):
         ("RFEI",      r["rfei"],           "> 3",  r["swamp_rfei_flag"]),
         ("mRFEI",     r["mrfei"],          "< 33", r["swamp_mrfei_flag"]),
         ("WIC mRFEI", r["mrfei_wic"],      "< 33", r["swamp_mrfei_wic_flag"]),
-       # ("NJ Swamp",  r["nj_swamp_score"], "≥ 75", r["swamp_nj_flag"]),
+        ("NJ Swamp",  r["nj_swamp_score"], "≥ 75", r["swamp_nj_flag"]),
     ]
     for name, value, rule, flag in methods:
         marker = "🔴 SWAMP" if flag else "🟢 OK"
@@ -240,9 +330,9 @@ def explain_zip(zip_code: str, df: pd.DataFrame):
 
     print("\n──────────────────────────────────────")
     count = int(r["swamp_method_count"])
-    print(f"\n  Methods flagged : {count}/3")
+    print(f"\n  Methods flagged : {count}/4")
 
-    if count == 3:
+    if count >= 3:
         label = "HIGH CONFIDENCE SWAMP"
     elif count == 2:
         label = "MIXED SWAMP SIGNAL"
@@ -259,7 +349,7 @@ def explain_zip(zip_code: str, df: pd.DataFrame):
         "swamp_rfei_flag":      "High fast food + convenience density (RFEI)",
         "swamp_mrfei_flag":     "Low healthy retail share (mRFEI)",
         "swamp_mrfei_wic_flag": "Weak WIC-certified access",
-       # "swamp_nj_flag":        "Poor spatial access + high unhealthy density (NJ score)",
+        "swamp_nj_flag":        "Poor spatial access + high unhealthy density (NJ score)",
     }
     any_driver = False
     for col, desc in drivers.items():
@@ -271,6 +361,7 @@ def explain_zip(zip_code: str, df: pd.DataFrame):
 
 
 def compare_zips(zip_codes: list, df: pd.DataFrame):
+    """Print a side-by-side method comparison table for multiple ZIPs."""
     rows = []
     for z in zip_codes:
         row = df[df["zip"] == z]
@@ -286,8 +377,8 @@ def compare_zips(zip_codes: list, df: pd.DataFrame):
             "mrfei_swamp": "✓" if r["swamp_mrfei_flag"]     else "–",
             "mrfei_wic":   round(r["mrfei_wic"], 1),
             "wic_swamp":   "✓" if r["swamp_mrfei_wic_flag"] else "–",
-           # "nj_score":    round(r["nj_swamp_score"], 1),
-           # "nj_swamp":    "✓" if r["swamp_nj_flag"]        else "–",
+            "nj_score":    round(r["nj_swamp_score"], 1),
+            "nj_swamp":    "✓" if r["swamp_nj_flag"]        else "–",
             "n_methods":   int(r["swamp_method_count"]),
             "typology":    r["access_typology"],
         })
@@ -303,6 +394,8 @@ def compare_zips(zip_codes: list, df: pd.DataFrame):
 
 
 # ── Desert target labels ──────────────────────────────────────────────────
+# Pure distance-based — no poverty gate
+# Matches symposium definition: ZIP has zero supermarkets within 5 miles
 df["is_desert_5mi"] = (df["nearest_supermarket_miles"] >= 5).astype(int)
 
 n_missing_dist = df["nearest_supermarket_miles"].isna().sum()
@@ -311,66 +404,38 @@ if n_missing_dist > 0:
     print(f"  ⚠ These zips are being counted as NOT desert due to NaN >= 5 → False")
     print(df.loc[df["nearest_supermarket_miles"].isna(), ["zip", "pop_density", "pct_poverty"]])
 
-# df["is_desert_usda"] = df["usda_desert_flag"]
-#
-# df["is_desert_fara"] = (df["usda_lila_1_10"].fillna(0) == 1).astype(int)
+# USDA strict: poverty ≥20% + distance threshold (urban 1mi / rural 10mi)
+df["is_desert_usda"] = df["usda_desert_flag"]
 
-# ═════════════════════════════════════════════════════════════════════════════
-# NJEDA Food Desert Community (FDC) crosswalk
-# Built via ZCTA-FDC polygon overlay in src/NJEDA.py → njeda_fdc_zip_crosswalk.csv
-# ═════════════════════════════════════════════════════════════════════════════
-njeda_path = DATA_DIR / "njeda_fdc_zip_crosswalk.csv"
-njeda = pd.read_csv(njeda_path, dtype={"zip": str})
-njeda["zip"] = njeda["zip"].str.zfill(5)
-df = df.merge(njeda[["zip", "is_desert_njeda"]], on="zip", how="left")
-df["is_desert_njeda"] = df["is_desert_njeda"].fillna(0).astype(int)
+# FARA LILA: low income AND low access per USDA tract-level definition
+# Already aggregated to ZIP in fara_agg — 1 if ANY tract in ZIP is LILA
+df["is_desert_fara"] = (df["usda_lila_1_10"].fillna(0) == 1).astype(int)
 
-
-# USDA (1/20) and FARA (1/10) are the same LILA formula at different rural
-# mileage cutoffs — not independent evidence. Collapse to one federal signal
-# before checking agreement against NJEDA's independently-derived FDC flag.
-df["is_desert_federal"] = (
-    (df["is_desert_usda"] == 1) | (df["is_desert_fara"] == 1)
-).astype(int)
-
+# Consensus: flagged by both definitions
 df["is_desert_consensus"] = (
-    (df["is_desert_federal"] == 1) & (df["is_desert_njeda"] == 1)
+    (df["is_desert_usda"] == 1) & (df["is_desert_fara"] == 1)
 ).astype(int)
 
-# # Desert consensus: NJEDA + USDA strict + FARA LILA (3-source, ≥2 agree)
-# df["is_desert_consensus"] = (
-#     (df["is_desert_usda"] + df["is_desert_fara"] + df["is_desert_njeda"]) >= 2
-# ).astype(int)
-
-print(f"\n── Desert definition comparison (post-fix)")
-print(f"  Federal (USDA ∪ FARA)          : {df['is_desert_federal'].sum()}")
-print(f"  NJEDA FDC                      : {df['is_desert_njeda'].sum()}")
-print(f"  Consensus (Federal ∩ NJEDA)    : {df['is_desert_consensus'].sum()}")
-# Model target
-#df["is_food_desert"] = df["is_desert_5mi"]
+# Model target — be explicit about which definition drives the classifier.
+# (This is now the ONLY assignment to is_food_desert — previously it was
+# set to usda_desert_flag and then immediately overwritten here, which
+# worked but was dead-code noise. See PATCH NOTES item 3.)
+df["is_food_desert"] = df["is_desert_5mi"]
 # df["is_food_desert"] = df["is_desert_fara"]
-df["is_food_desert"] = df["is_desert_consensus"]
+# df["is_food_desert"] = df["is_desert_consensus"]
 
-df["desert_and_swamp"] = (
-    (df["is_food_desert"] == 1) &
-    (df["is_swamp_consensus"] == 1)
-).astype(int)
-
-print(
-    f"\n── Desert + Swamp overlap: {df['desert_and_swamp'].sum()}"
-)
 print("\n── Desert definition comparison")
-print(f"  USDA strict      : {df['is_desert_usda'].sum()}")
-print(f"  FARA LILA 1/10   : {df['is_desert_fara'].sum()}")
-print(f"  NJEDA FDC                      : {df['is_desert_njeda'].sum()}")
-print(f"  Consensus (≥2 of 3)            : {df['is_desert_consensus'].sum()}")
+print(f"  USDA strict (14 expected)      : {df['is_desert_usda'].sum()}")
+print(f"  FARA LILA 1/10 (109 expected)  : {df['is_desert_fara'].sum()}")
+print(f"  Consensus (both)               : {df['is_desert_consensus'].sum()}")
 print(f"  Model target (is_food_desert)  : {df['is_food_desert'].sum()}")
 
 # Simple renames
 df["median_income"] = df["Median Household Income_acs"]
 df["population"]    = df["Total Population_acs"]
 
-df["supermarkets_within_5mi"] = df["supermarket"]
+# Supermarkets within 5mi — placeholder using ZIP count until spatial buffer computed
+df["supermarkets_within_5mi"] = df["supermarket"]   # count within ZIP boundary (proxy only)
 degree_cols = [
     "Population Bachelor's Degree",
     "Population Master's Degree",
@@ -381,8 +446,12 @@ df["pct_college"] = (
     df[degree_cols].sum(axis=1) / df["Population Education Universe"] * 100
 )
 
-POVERTY_THRESHOLD = 20
-INCOME_THRESHOLD  = 80_000
+# ── Desert subtype: distinguish isolated-but-not-poor (e.g. elderly/
+# retirement communities) from isolated-and-poor deserts. Both are
+# real access problems, but they call for different interventions
+# and confound simple SNAP/poverty-based analyses if not separated.
+POVERTY_THRESHOLD = 15.0
+INCOME_THRESHOLD  = 65_000
 
 df["desert_subtype"] = "Not a Desert"
 df.loc[
@@ -401,86 +470,6 @@ df.loc[
 print("\n── Desert subtype breakdown ──────────────────────────")
 print(df["desert_subtype"].value_counts().to_string())
 
-mercer_zips = df[df["county_fips"] == "021"]  # or however Mercer's coded here
-matched = mercer_zips["zip"].isin(njeda["zip"])
-print(f"Mercer ZIPs matched to NJEDA crosswalk: {matched.sum()} / {len(mercer_zips)}")
-print(mercer_zips.loc[~matched, ["zip", "municipality"]])
-
-
-# ═════════════════════════════════════════════════════════════════════════════
-# 6. Access Typology
-# ═════════════════════════════════════════════════════════════════════════════
-def classify(row):
-    is_desert = row["is_food_desert"] == 1
-    is_swamp  = row["is_swamp_consensus"] == 1
-
-    if is_desert and is_swamp:
-        return "Dollar Store Desert" if row["dollar_store_dominance"] == 1 else "Desert-Swamp Overlap"
-
-    if is_desert:
-        return "Dollar Store Desert" if row["dollar_store_dominance"] == 1 else "True Desert"
-
-    if row["is_food_mirage"] == 1:
-        return "Food Mirage"
-
-    if is_swamp:
-        return "Food Swamp"
-
-    return "Well Served"
-
-
-df["access_typology"] = df.apply(classify, axis=1)
-
-n_unclassified = df["access_typology"].isna().sum()
-print(f"\n── Typology classification check")
-print(f"  Unclassified ZIPs (should be 0): {n_unclassified}")
-print(df["access_typology"].value_counts(dropna=False).to_string())
-
-socio_df = df.loc[df["desert_subtype"] == "Socioeconomic Desert (isolated AND poor)"]
-print(f"\n── Socioeconomic Deserts ({len(socio_df)})")
-print(socio_df[["zip", "county", "municipality", "pct_poverty",
-                "median_income", "nearest_supermarket_miles"]]
-      .sort_values(["county", "zip"]).to_string(index=False))
-
-struct_df = df.loc[df["desert_subtype"] == "Structural Desert (isolated, not poor — e.g. elderly/retirement)"]
-print(f"\n── Structural Deserts ({len(struct_df)})")
-print(struct_df[["zip", "county", "municipality", "pct_poverty",
-                 "median_income", "nearest_supermarket_miles", "pct_elderly"]]
-      .sort_values(["county", "zip"]).to_string(index=False))
-
-all_desert_df = df.loc[df["is_food_desert"] == 1]
-print(f"\n── All Consensus Food Deserts ({len(all_desert_df)})")
-
-print(
-    df.loc[
-        df["desert_subtype"] == "Socioeconomic Desert (isolated AND poor)",
-        ["zip", "county", "municipality", "pct_poverty",
-         "median_income", "nearest_supermarket_miles"]
-    ]
-    .sort_values(["county", "zip"])
-    .to_string(index=False)
-)
-
-print(
-    df.loc[
-        df["desert_subtype"] == "Structural Desert (isolated, not poor — e.g. elderly/retirement)",
-        ["zip", "county", "municipality", "pct_poverty",
-         "median_income", "nearest_supermarket_miles", "pct_elderly"]
-    ]
-    .sort_values(["county", "zip"])
-    .to_string(index=False)
-)
-
-print("\n── All Consensus Food Deserts (52)")
-print(
-    df.loc[
-        df["is_food_desert"] == 1,
-        ["zip", "county", "municipality", "desert_subtype"]
-    ]
-    .sort_values(["desert_subtype", "county", "zip"])
-    .to_string(index=False)
-)
-
 
 # ═════════════════════════════════════════════════════════════════════════════
 # 12. Save
@@ -490,60 +479,29 @@ df.to_csv(OUTPUT, index=False)
 print(f"  Saved → {OUTPUT}")
 print(f"  Shape → {df.shape}")
 
+# Also export a focused method-comparison CSV for all ZIPs
 method_cols = [
     "zip", "rfei", "swamp_rfei_flag",
     "mrfei", "swamp_mrfei_flag",
-    "mrfei_wic", "swamp_mrfei_wic_flag","swamp_method_count", "access_typology",
+    "mrfei_wic", "swamp_mrfei_wic_flag",
+    "nj_swamp_score", "swamp_nj_flag",
+    "swamp_method_count", "access_typology",
 ]
 df[method_cols].to_csv(DATA_DIR / "swamp_method_comparison.csv", index=False)
 print(f"  Saved → swamp_method_comparison.csv")
 
-print(
-    pd.crosstab(
-        df["is_food_desert"],
-        df["is_swamp_consensus"]
-    )
-)
-
 
 # ═════════════════════════════════════════════════════════════════════════════
-# 13. Example usage
+# 13. Example usage — edit ZIP codes here
 # ═════════════════════════════════════════════════════════════════════════════
-def explain_zip(zip_code: str, df: pd.DataFrame):
-    row = df[df["zip"] == zip_code]
-    if row.empty:
-        print(f"ZIP {zip_code} not found.")
-        return
+explain_zip("07103", df)
 
-    r = row.iloc[0]
+compare_zips(["08087", "07201", "08401"], df)
 
-    print("\n══════════════════════════════════════")
-    print(f"  ZIP CODE: {zip_code}")
-    print("══════════════════════════════════════\n")
+df_check = pd.read_csv(OUTPUT, dtype={"zip": str})
 
-    print("📊 SWAMP METHOD COMPARISON\n")
-    methods = [
-        ("RFEI",      r["rfei"],           "> 3",  r["swamp_rfei_flag"]),
-        ("mRFEI",     r["mrfei"],          "< 33", r["swamp_mrfei_flag"]),
-        ("WIC mRFEI", r["mrfei_wic"],      "< 33", r["swamp_mrfei_wic_flag"]),
-    ]
-    for name, value, rule, flag in methods:
-        marker = "🔴 SWAMP" if flag else "🟢 OK"
-        print(f"  {name:12} | value = {value:7.2f} | threshold {rule:6} | {marker}")
+print(f"Total columns: {df_check.shape[1]}")
+print("\nAll columns:")
 
-    print("\n🏜️  DESERT METHOD COMPARISON\n")
-    desert_methods = [
-        ("USDA LILA 1/20", r["is_desert_usda"]),
-        ("FARA LILA 1/10", r["is_desert_fara"]),
-        ("NJEDA FDC",       r["is_desert_njeda"]),
-    ]
-    for name, flag in desert_methods:
-        marker = "🔴 DESERT" if flag else "🟢 OK"
-        print(f"  {name:16} | {marker}")
-    print(f"\n  nearest_supermarket_miles: {r['nearest_supermarket_miles']:.2f}")
-    print(f"  dollar_store_dominance:    {r['dollar_store_dominance']}")
-    # ── END NEW BLOCK ──
-
-    print("\n──────────────────────────────────────")
-    count = int(r["swamp_method_count"])
-
+for i, c in enumerate(df_check.columns):
+    print(f"{i:3d}  {c}")
