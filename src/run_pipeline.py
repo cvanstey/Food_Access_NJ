@@ -33,6 +33,8 @@ STAGES = [
     "06_analytics.py",
     "../testing/compare_density.py",
     "07_targeted_analysis.py",
+    "mcnemar_poverty_requirement.py",
+    "poor in wealthy tracts.py",
     #"08_zip_lookup.py", this is part of an interactive module. if you fork the repo, it should run as a script.
 ]
 
