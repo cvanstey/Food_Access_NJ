@@ -108,10 +108,13 @@ NJ_Food_Access/
 │   ├── 06_analytics.py
 │   ├── 07_targeted_analysis.py
 │   ├── 08_zip_lookup.py
+│   ├── 09_poor_in_wealthy_tracts.py
+│   ├── mcnemar_poverty_requirement.py
 │   ├── rename_columns.py
 │   └── njzipfilter.py
 │
 ├── testing/
+│   └── compare_density.py
 ├── requirements.txt
 ├── README.md
 └── .gitignore
@@ -142,7 +145,37 @@ This runs every stage below in order and stops immediately if one fails, logging
 
 ### The Pipeline
 
-The pipeline runs in ten stages. Stage 4 (modeling) is by far the longest, typically taking up to 6 minutes. It compares Logistic Regression, Random Forest, and Gradient Boosting classifiers for consensus desert-status prediction (Gradient Boosting is selected on cross-validated AUC), fits 20 individual Random Forest health-outcome regressors plus companion OLS models, and validates thoroughly: a leave-one-county-out spatial cross-validation (14 county-level fits — 7 of NJ's 21 counties are skipped for having zero desert cases), a 2,000-resample bootstrap for confidence intervals, and permutation importance with 20 repeats per feature. If a run appears to hang here, it's very likely still working — this stage does more computation than the rest of the pipeline combined.
+The orchestrator's `STAGES` list runs **12 scripts** in order:
+
+```text
+01_load_data.py
+02a_nearest.py
+02b_merge_sources.py
+02c_clean_NJ_features_zip2.py
+03_features.py
+04_model.py
+05_reports.py
+06_analytics.py
+../testing/compare_density.py
+07_targeted_analysis.py
+mcnemar_poverty_requirement.py
+09_poor_in_wealthy_tracts.py
+```
+
+`08_zip_lookup.py` is **not** in this list — it's commented out in `run_pipeline.py` on purpose, since it's an interactive lookup tool rather than a batch stage. Run it manually and separately (see below); `python run_pipeline.py` will never invoke it.
+
+> **Check this before relying on the orchestrator:** `run_pipeline.py`'s `STAGES` list must contain the exact filename `run_stage()` looks for on disk. If the file was recently renamed to `09_poor_in_wealthy_tracts.py`, confirm the `STAGES` list was updated to match — otherwise the orchestrator will silently `[SKIP]` this stage (file-not-found) rather than erroring.
+
+Two stages still don't follow the numbered `0X_name.py` convention:
+
+- **`compare_density.py`** (in `../testing/`, run between stages 06 and 07) — the density-ablation / circularity check comparing desert-classifier performance with and without `pop_density` as a feature (Configs A/B/C).
+- **`mcnemar_poverty_requirement.py`** (run after `07_targeted_analysis.py`) — an exact McNemar's test on whether dropping USDA's poverty requirement from the desert definition changes classification for a non-random share of ZIPs, plus a comparison of the "gained-only" ZIPs against core LILA ZIPs.
+
+`09_poor_in_wealthy_tracts.py` (run last) now follows the numbered convention. It picks up where `mcnemar_poverty_requirement.py` leaves off: among the "gained-only" ZIPs identified there (ZIPs that would only qualify as food deserts if USDA's poverty requirement were dropped — i.e. `usda_la_1_10=1, usda_lila_1_10=0`), it asks where the actual poor residents are hiding, via two lenses — ranking those ZIPs by *raw count* of residents below poverty (not rate, since a low-rate ZIP can still contain a large poor population), and flagging census tracts inside those ZIPs whose poverty rate sits 10+ points above the ZIP's own average. Its docstring is explicit that this does **not** argue for removing food-desert status from anyone — it's the opposite concern: are poor residents being undercounted because they live inside a ZIP that reads as wealthy on average. Outputs: `gained_only_ranked_by_poor_count.csv`, `hidden_poverty_pockets.csv`, `hidden_pocket_zip_summary.csv`.
+
+Because `stage_id()` derives `--from`/`--only` ids by splitting each filename on its first underscore, the clean ids (`01`, `02a`, `04`, `09`, etc.) work for every numbered script, including `09_poor_in_wealthy_tracts.py` now. `mcnemar_poverty_requirement.py`'s id is still `mcnemar` (no numeric prefix).
+
+Stage 4 (modeling) is by far the longest single stage, typically taking up to 6 minutes. It compares Logistic Regression, Random Forest, and Gradient Boosting classifiers for consensus desert-status prediction (Gradient Boosting is selected on cross-validated AUC), fits 20 individual Random Forest health-outcome regressors plus companion OLS models, and validates thoroughly: a leave-one-county-out spatial cross-validation (14 county-level fits — 7 of NJ's 21 counties are skipped for having zero desert cases), a 2,000-resample bootstrap for confidence intervals, and permutation importance with 20 repeats per feature. If a run appears to hang here, it's very likely still working — this stage does more computation than the rest of the pipeline combined.
 
 Note that stage output does not stream live when run through the orchestrator — each stage runs as a subprocess with `stdout` redirected straight to its log file in `pipeline_logs/`, so the notebook/terminal will show nothing between stage headers no matter how long a stage takes. To check that a long-running stage (especially stage 4) is still progressing, tail the current log file in a separate cell/terminal:
 
@@ -157,21 +190,24 @@ If nj_zip_complete.csv is missing, regenerate it by running:
 
 python 00a_build_crosswalk.py
 python 00b_enrich_crosswalk.py
-python 01_load_data.py              # Data acquisition — downloads/reads all source datasets
-python 02a_nearest.py               # Distance calculations (supermarkets, convenience stores, etc.)
-python 02b_merge_sources.py         # Merges all cleaned sources into a single ZIP-level feature table
-python 02c_clean_NJ_features_zip2.py    # Cleans nj_zip_features_v2.csv (dedup, sentinel values, type fixes) → nj_zip_features_v2_clean.csv
-python 03_features.py               # Builds derived features and metrics
-python 04_model.py                  # Statistical / ML modeling
-python 05_reports.py                # Generates report outputs
-python 06_analytics.py               # Core analysis
-python 07_targeted_analysis.py      # Sub-population analysis (elderly ZIPs, per hypothesis)
-python 08_zip_lookup.py             # Interactive ZIP-level lookup tool
+python 01_load_data.py                    # Data acquisition — downloads/reads all source datasets
+python 02a_nearest.py                     # Distance calculations (supermarkets, convenience stores, etc.)
+python 02b_merge_sources.py               # Merges all cleaned sources into a single ZIP-level feature table
+python 02c_clean_NJ_features_zip2.py      # Cleans nj_zip_features_v2.csv (dedup, sentinel values, type fixes) → nj_zip_features_v2_clean.csv
+python 03_features.py                     # Builds derived features and metrics
+python 04_model.py                        # Statistical / ML modeling
+python 05_reports.py                      # Generates report outputs
+python 06_analytics.py                    # Core analysis
+python ../testing/compare_density.py      # Density-ablation / circularity check (not run by orchestrator until stage 06 completes)
+python 07_targeted_analysis.py            # Sub-population analysis (elderly ZIPs, per hypothesis)
+python mcnemar_poverty_requirement.py     # McNemar's test: effect of dropping USDA's poverty requirement
+python 09_poor_in_wealthy_tracts.py       # Hidden poverty pocket / tract-masking analysis (run after 02b_merge_sources.py at minimum)
+python 08_zip_lookup.py                   # Interactive ZIP-level lookup tool — NOT run by the orchestrator; run manually
 ```
 
 `rename_columns.py` is not a standalone stage — it's imported directly by `02b_merge_sources.py` to rename ACS/PLACES columns before saving. `pipeline_utils.py` is likewise a shared module, not a stage.
 
-*Note: `clean_NJ_features_zip2.py` isn't yet renamed to match the pipeline's numbered convention (e.g. `02c_clean_features.py`) — rename it and update `run_pipeline.py`'s `STAGES` list once you do.*
+*Note: `clean_NJ_features_zip2.py` isn't yet renamed to match the pipeline's numbered convention (e.g. `02c_clean_features.py`) — rename it and update `run_pipeline.py`'s `STAGES` list once you do. The same applies to `mcnemar_poverty_requirement.py`, which could become e.g. `10_mcnemar_poverty.py`.*
 
 `01_load_data.py` performs data acquisition only — it downloads/reads all source datasets, prints a confirmation summary for each of its 10 sections, and writes cleaned intermediate files into `data/` for use by later steps: `acs_df.csv`, `places_df.csv`, `crosswalk_df.csv`, `wic_df.csv`, `snap_df.csv`, `fara_agg.csv`, `osm_counts.csv`, `njeda_communities.csv`.
 
@@ -251,6 +287,12 @@ A core finding of the accompanying analysis is that blending distinct sources of
 ### On OSM Classifications
 
 OSM uses its own tagging taxonomy that does not map cleanly onto food access research definitions. Wawa is tagged `shop=convenience` in OSM (inflating the RFEI numerator), and small grocers are often tagged the same way (deflating the denominator). RFEI and mRFEI store counts therefore use SNAP/WIC data where available; OSM data is used primarily for spatial features (nearest-distance calculations) where it is more reliable.
+
+### Known Issues
+
+- **`05_reports.py`'s statewide typology breakdown uses stale category names.** The `nj_statewide_summary.csv` output currently prints `Transit Desert` and `Adequate Access` (both 0%) instead of `Well Served` and `Desert-Swamp Overlap`, and the reported percentages sum to ~69% rather than 100%. The 6-category typology (`True Desert`, `Food Swamp`, `Food Mirage`, `Well Served`, `Dollar Store Desert`, `Desert-Swamp Overlap`) is correct everywhere else in the pipeline (e.g. `access_typology_profiles.csv`) — only this one summary block needs its category list updated.
+- **Two different "swamp" figures appear side by side without explanation.** `pct_food_swamp_consensus` in the statewide summary reports 71.6% (428 ZIPs — any ZIP meeting the 2-of-3 `is_swamp_consensus` flag), while the access typology table in the same report shows `Food Swamp` at 61.7% (369 ZIPs — the subset whose *typology label* is purely "Food Swamp," after ZIPs that are also Desert-Swamp Overlap, Food Mirage, etc. are broken out). Both numbers are correct, but the report doesn't currently explain the difference; consider a one-line note in the generated report or a renamed column.
+- **`mrfei` and `mrfei_wic` flag identical ZIPs (442, 73.9%) in `swamp_method_comparison.csv`.** The premise for using three independent swamp methods is that they shouldn't share a common blind spot. Worth checking how `mrfei_wic` is computed in `02b_merge_sources.py`/`03_features.py` to confirm it's actually using WIC-vendor data as the healthy-retailer count rather than falling back to the same value as plain `mrfei`.
 
 ---
 
