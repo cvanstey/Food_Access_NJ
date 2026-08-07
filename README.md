@@ -9,8 +9,9 @@ Analyzes food landscapes across New Jersey ZIP codes by comparing USDA Food Acce
 - Integrates USDA, Census, CDC PLACES, NJEDA, SNAP, WIC, and OpenStreetMap datasets
 - Calculates nearest supermarket and food retailer distances
 - Evaluates food access patterns aggregated to ZIP/ZCTA reporting units while preserving tract-level USDA comparisons where available
-- Computes multiple Food Swamp metrics (RFEI, mRFEI, NJEDA)
-- Generates ZIP-level vulnerability indices
+- Reconciles three food desert definitions (USDA LILA, NJEDA Food Desert Community, and a trained classifier) into a consensus flag
+- Reconciles three food swamp metrics (RFEI, mRFEI, WIC-specific mRFEI) into a consensus flag
+- Generates separate ZIP-level vulnerability indices for elderly and no-vehicle populations, rather than one blended score
 - Produces reports and statistical analyses
 - Interactive ZIP code lookup utility
 
@@ -120,13 +121,14 @@ NJ_Food_Access/
 
 A Google Colab notebook is provided for reproducible execution:
 
-[Open in Google Colab]([COLAB_LINK](https://colab.research.google.com/drive/1MB6RLrqhqrNn8QonWsdPujrutfzU-swH?usp=sharing))
+[Open in Google Colab](https://colab.research.google.com/drive/1MB6RLrqhqrNn8QonWsdPujrutfzU-swH?usp=sharing)
 
 The notebook:
 1. Clones this repository
 2. Installs dependencies
 3. Mounts the Google Drive data package
 4. Runs the complete pipeline
+
 ---
 ## Running the Pipeline
 
@@ -140,7 +142,7 @@ This runs every stage below in order and stops immediately if one fails, logging
 
 ### The Pipeline
 
-The pipeline runs in ten stages. Stage 4 (modeling) is by far the longest, typically taking up to 6 minutes. It fits three separate models — including 20 individual health-outcome regressors — and validates them thoroughly: a leave-one-county-out cross-validation that trains a fresh Random Forest once per NJ county (21 fits total), a 2,000-resample bootstrap for confidence intervals, and permutation importance with 20 repeats per feature. If a run appears to hang here, it's very likely still working — this stage does more computation than the rest of the pipeline combined.
+The pipeline runs in ten stages. Stage 4 (modeling) is by far the longest, typically taking up to 6 minutes. It compares Logistic Regression, Random Forest, and Gradient Boosting classifiers for consensus desert-status prediction (Gradient Boosting is selected on cross-validated AUC), fits 20 individual Random Forest health-outcome regressors plus companion OLS models, and validates thoroughly: a leave-one-county-out spatial cross-validation (14 county-level fits — 7 of NJ's 21 counties are skipped for having zero desert cases), a 2,000-resample bootstrap for confidence intervals, and permutation importance with 20 repeats per feature. If a run appears to hang here, it's very likely still working — this stage does more computation than the rest of the pipeline combined.
 
 Note that stage output does not stream live when run through the orchestrator — each stage runs as a subprocess with `stdout` redirected straight to its log file in `pipeline_logs/`, so the notebook/terminal will show nothing between stage headers no matter how long a stage takes. To check that a long-running stage (especially stage 4) is still progressing, tail the current log file in a separate cell/terminal:
 
@@ -178,13 +180,13 @@ python 08_zip_lookup.py             # Interactive ZIP-level lookup tool
 | Dataset | Shape |
 |---|---|
 | OSM ZIPs | 535 ZIPs × 18 cols |
-| OSM food locations | 37,818 elements |
+| OSM food locations | 37,818 elements (2,208 supermarkets, 8,814 fast-food outlets, 5,230 convenience stores after filtering) |
 | ZCTA boundaries (NJ) | 598 rows × 3 cols |
 | County boundaries (NJ) | 21 rows × 18 cols |
 | Census ACS estimates | 598 rows × 59 cols |
 | CDC PLACES health data | 32,520 rows × 84 cols |
 | ZIP → Municipality crosswalk | 598 rows × 36 cols |
-| WIC authorized retailers | 889 rows (NJ only) |
+| WIC authorized retailers | 890 rows (NJ only) |
 | SNAP authorized retailers | 5,447 rows (NJ only) |
 | NJEDA food desert communities | 25 communities |
 | USDA FARA (tract-level) | 2,002 rows × 12 cols |
@@ -192,24 +194,28 @@ python 08_zip_lookup.py             # Interactive ZIP-level lookup tool
 
 The script ends with an **out-of-state ZIP trace** — a diagnostic check confirming that border ZCTAs which geometrically touch NJ counties (e.g. `19153` in Philadelphia, `10977` in Spring Valley, NY) are correctly filtered out before reaching the final ZIP-level datasets. Seeing these ZIPs in early-stage debug output is expected; seeing them in final aggregated files would indicate a bug.
 
-
 ---
 ## Statistical Modeling
 
 The project evaluates food access vulnerability using:
 
 - Exploratory data analysis and correlation analysis
-- Logistic regression classification
-- Random Forest classification
-- Gradient Boosting classification
+- Logistic regression, Random Forest, and Gradient Boosting classification (compared for consensus desert-status prediction; Gradient Boosting selected on cross-validated AUC)
+- Random Forest regressors for 20 CDC PLACES health outcomes, plus OLS models controlling for a principal-component deprivation index
 - Leave-one-county-out spatial cross-validation
 - Bootstrap confidence intervals for model evaluation
 
 Model features include demographic, socioeconomic, transportation, and environmental variables while excluding proximity features used to define the target outcome to reduce leakage.
+
 ### Food Desert Methods
 
-**USDA Food Access Research Atlas (FARA)**
-This project implements the primary USDA ERS Low Income Low Access (LILA) measure using poverty and supermarket-distance thresholds. Official USDA FARA flags are also imported for comparison.
+Three independently constructed desert definitions are reconciled into a consensus flag:
+
+- **USDA Food Access Research Atlas (FARA) / LILA** — the federal Low Income Low Access measure, evaluated at both the 1-mile/10-mile and ½-mile/10-mile thresholds. Official USDA FARA flags are imported for direct comparison.
+- **NJEDA Food Desert Community (FDC) designation** — the state's sub-municipal block-group-based classification.
+- **A trained classifier** — a Gradient Boosting model fit on seven socioeconomic features (median income, poverty rate, SNAP rate, transit rate, no-vehicle rate, college-education rate, elderly rate) to predict desert status.
+
+A ZIP is flagged as a **consensus food desert** when at least 2 of these 3 methods agree (45 consensus deserts statewide). Consensus deserts are further split into two subtypes that respond to different underlying causes of isolation: **socioeconomic deserts** (isolated and poor) and **structural deserts** (isolated but not poor, disproportionately elderly).
 
 ### Food Swamp Methods
 
@@ -217,21 +223,23 @@ This project implements the primary USDA ERS Low Income Low Access (LILA) measur
 Ratio of unhealthy to healthy retailers, following Cooksey-Stowers (2017): `(fast_food + convenience) / (supermarket + grocery + produce_market)`. An extended variant (`rfei_full`) adds dollar stores to the numerator.
 
 **mRFEI (Modified RFEI)**
-CDC method measuring the percentage of healthy retailers among all food retailers: `(healthy / total) × 100`. A WIC-specific variant (`mrfei_wic`) substitutes WIC-certified vendors as the healthy retailer count.
+CDC method measuring the percentage of healthy retailers among all food retailers: `(healthy / total) × 100`.
 
-**NJ Food Swamp Score**
-Based on the NJ DCA / NJEDA methodology: ratio of nearest distance to a swamp outlet vs. nearest supermarket, scaled 0–100. A high score indicates the unhealthy option is spatially closer than the healthy one.
+**WIC-specific mRFEI**
+Substitutes WIC-certified vendors as the healthy retailer count.
 
-**4-Method Consensus Vote**
-All four swamp methods are combined into a consensus flag (`is_swamp_consensus`) requiring agreement from at least 2 of 4 methods, with a continuous score (`swamp_score_continuous`) and method count (`swamp_method_count`) for transparency.
+**3-Method Consensus Vote**
+These three swamp methods are combined into a consensus flag (`is_swamp_consensus`) requiring agreement from at least 2 of 3 methods, with a continuous score (`swamp_score_continuous`) and method count (`swamp_method_count`) for transparency. This consensus flags 369 ZIPs (61.7% of the state) as food swamps — a high enough share that swamp status alone does not separate at-risk ZIPs from healthy ones as cleanly as desert status does.
 
 ### Composite & Vulnerability Scores
 
-**Composite Vulnerability Index** (`composite_vuln_index`) blends supermarket distance, RFEI, poverty rate, vehicle access, and elderly concentration using percentile-rank weighting. Note: this differs from the County Health Rankings & Roadmaps Food Environment Index, which uses a ranked-average method on a 0–10 scale, and from the NJEDA composite factor score, which uses iterated principal factor analysis with orthogonal varimax rotation across 24 neighborhood indicators — a full factor analysis implementation is a planned improvement.
+A core finding of the accompanying analysis is that blending distinct sources of need into a single composite score can conceal which residents within a ZIP actually bear the burden — a structurally isolated, elderly-heavy ZIP and a poor, transportation-poor ZIP can post nearly identical composite scores while needing entirely different interventions. For that reason:
 
-**Sub-population Vulnerability Scores** — `novehicle_vuln_score` and `elderly_vuln_score` — apply similar percentile-rank weighting within those populations specifically.
+- **Poverty is treated as a control/stratification variable**, not folded into a labeled vulnerability score.
+- **`elderly_vuln_score`** and **`novehicle_vuln_score`** are computed as separate percentile-rank-weighted indices within those sub-populations, and are the recommended indicators for targeting age-friendly transit vs. income/transit interventions respectively.
+- A **`composite_vuln_index`**, blending supermarket distance, RFEI, poverty rate, vehicle access, and elderly concentration via percentile-rank weighting, is still computed and used for exploratory/reference purposes — but should not substitute for the separate sub-population scores in funding or policy decisions. Note: this differs from the County Health Rankings & Roadmaps Food Environment Index, which uses a ranked-average method on a 0–10 scale, and from the NJEDA composite factor score, which uses iterated principal factor analysis with orthogonal varimax rotation across 24 neighborhood indicators — a full factor analysis implementation is a planned improvement.
 
-**Rule-based Access Typology** classifies each ZIP into one of four categories: True Desert, Food Swamp, Food Mirage, or Dollar Store Desert.
+**Rule-based Access Typology** classifies each ZIP into one of six categories: True Desert, Food Swamp, Food Mirage, Well Served, Dollar Store Desert, or Desert-Swamp Overlap.
 
 ### Implementation Notes
 
